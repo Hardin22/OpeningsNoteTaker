@@ -1,0 +1,286 @@
+/**
+ * Utility per il posizionamento intelligente dei nodi nel grafo
+ */
+
+// Costanti di configurazione del layout
+const VERTICAL_SPACING = 100;   // Spazio verticale tra livelli
+const NODE_WIDTH = 150;         // Larghezza stimata di un nodo
+const HORIZONTAL_SPACING = 60;  // Spazio orizzontale minimo tra nodi fratelli
+const SUBTREE_PADDING = 20;     // Padding aggiuntivo tra sottoalberi
+
+/**
+ * Calcola la posizione ottimale per un nuovo nodo nel grafo
+ * 
+ * @param {Array} nodes - Array di tutti i nodi nel grafo
+ * @param {Array} connections - Array di tutte le connessioni nel grafo
+ * @param {string|number} parentId - ID del nodo genitore
+ * @return {Object} - Coordinate {x, y} per il nuovo nodo
+ */
+export const calculateNodePosition = (nodes, connections, parentId) => {
+  if (!nodes || !connections || !parentId) {
+    // Posizione di default se non abbiamo dati sufficienti
+    return { x: 100, y: 100 };
+  }
+
+  // Trova il nodo genitore
+  const parentNode = nodes.find(node => node.id === parentId);
+  if (!parentNode) {
+    return { x: 100, y: 100 };
+  }
+
+  // Trova tutti i figli diretti del nodo genitore
+  const childrenIds = connections
+    .filter(conn => conn.fromId === parentId)
+    .map(conn => conn.toId);
+  
+  const childrenNodes = nodes.filter(node => childrenIds.includes(node.id));
+  
+  // Se non ci sono figli, posiziona il primo figlio direttamente sotto il genitore
+  if (childrenNodes.length === 0) {
+    return {
+      x: parentNode.x,
+      y: parentNode.y + VERTICAL_SPACING
+    };
+  }
+
+  // Calcola l'inviluppo (bounding box) dei figli esistenti
+  let minX = Math.min(...childrenNodes.map(node => node.x));
+  let maxX = Math.max(...childrenNodes.map(node => node.x));
+  
+  // Il primo figlio dovrebbe essere posizionato sotto il genitore, i successivi a destra
+  // con uno spostamento incrementale dei figli esistenti verso sinistra
+  const newChildPosition = { 
+    x: maxX + NODE_WIDTH/2 + HORIZONTAL_SPACING,
+    y: parentNode.y + VERTICAL_SPACING
+  };
+  
+  // Calcola gli spostamenti necessari per i nodi esistenti
+  const shifts = calculateShiftsForExistingNodes(nodes, connections, childrenNodes, newChildPosition);
+  
+  // Applica gli spostamenti a tutti i nodi (simulazione per verificare collisioni)
+  const simulatedNodes = applyShifts(nodes, shifts);
+  
+  // Verifica collisioni nel layout simulato e adatta se necessario
+  const finalPosition = avoidCollisions(simulatedNodes, newChildPosition, NODE_WIDTH, HORIZONTAL_SPACING);
+  
+  return finalPosition;
+};
+
+/**
+ * Calcola gli spostamenti necessari per i nodi esistenti quando si aggiunge un nuovo nodo
+ * 
+ * @param {Array} nodes - Tutti i nodi
+ * @param {Array} connections - Tutte le connessioni
+ * @param {Array} childrenNodes - Nodi figli del padre del nuovo nodo
+ * @param {Object} newChildPosition - Posizione prevista per il nuovo figlio
+ * @return {Object} - Mappa degli ID nodo agli spostamenti {x, y}
+ */
+const calculateShiftsForExistingNodes = (nodes, connections, childrenNodes, newChildPosition) => {
+  const shifts = {};
+  
+  // Se c'è solo un figlio, spostiamolo leggermente a sinistra
+  if (childrenNodes.length === 1) {
+    const existingChild = childrenNodes[0];
+    shifts[existingChild.id] = { 
+      x: existingChild.x - NODE_WIDTH/2 - HORIZONTAL_SPACING/2,
+      y: existingChild.y
+    };
+    return shifts;
+  }
+  
+  // Se ci sono più figli, distribuiamo lo spazio più uniformemente
+  const totalWidth = newChildPosition.x - childrenNodes[0].x + NODE_WIDTH;
+  const shiftPerChild = totalWidth / (childrenNodes.length + 1);
+  
+  childrenNodes.forEach((child, index) => {
+    // Calcoliamo uno spostamento progressivo verso sinistra
+    const shiftLeft = shiftPerChild * (childrenNodes.length - index) / 2;
+    shifts[child.id] = {
+      x: child.x - shiftLeft,
+      y: child.y
+    };
+    
+    // Propaghiamo lo spostamento a tutti i discendenti di questo nodo
+    propagateShiftsToDescendants(nodes, connections, child.id, -shiftLeft, 0, shifts);
+  });
+  
+  return shifts;
+};
+
+/**
+ * Propaga gli spostamenti ai nodi discendenti per mantenere la struttura relativa
+ * 
+ * @param {Array} nodes - Tutti i nodi
+ * @param {Array} connections - Tutte le connessioni
+ * @param {string|number} nodeId - ID del nodo corrente
+ * @param {number} deltaX - Spostamento orizzontale da applicare
+ * @param {number} deltaY - Spostamento verticale da applicare
+ * @param {Object} shifts - Mappa degli spostamenti in costruzione
+ */
+const propagateShiftsToDescendants = (nodes, connections, nodeId, deltaX, deltaY, shifts) => {
+  // Trova tutti i figli diretti del nodo
+  const childrenIds = connections
+    .filter(conn => conn.fromId === nodeId)
+    .map(conn => conn.toId);
+  
+  if (childrenIds.length === 0) return;
+  
+  childrenIds.forEach(childId => {
+    const childNode = nodes.find(node => node.id === childId);
+    if (!childNode) return;
+    
+    // Applica lo stesso spostamento al figlio
+    shifts[childId] = {
+      x: childNode.x + deltaX,
+      y: childNode.y + deltaY
+    };
+    
+    // Ricorsivamente propaga ai figli
+    propagateShiftsToDescendants(nodes, connections, childId, deltaX, deltaY, shifts);
+  });
+};
+
+/**
+ * Applica gli spostamenti calcolati a tutti i nodi (simulazione)
+ * 
+ * @param {Array} nodes - Nodi originali
+ * @param {Object} shifts - Mappa degli spostamenti
+ * @return {Array} - Nodi con posizioni aggiornate
+ */
+const applyShifts = (nodes, shifts) => {
+  return nodes.map(node => {
+    if (shifts[node.id]) {
+      return {
+        ...node,
+        x: shifts[node.id].x,
+        y: shifts[node.id].y
+      };
+    }
+    return node;
+  });
+};
+
+/**
+ * Verifica e risolve le collisioni tra nodi
+ * 
+ * @param {Array} nodes - Nodi con posizioni simulate
+ * @param {Object} newPosition - Posizione proposta per il nuovo nodo
+ * @param {number} nodeWidth - Larghezza stimata di un nodo
+ * @param {number} spacing - Spazio minimo tra nodi
+ * @return {Object} - Posizione finale regolata
+ */
+const avoidCollisions = (nodes, newPosition, nodeWidth, spacing) => {
+  // Per ogni nodo esistente, verifica la sovrapposizione
+  let finalPosition = { ...newPosition };
+  
+  let hasCollision;
+  do {
+    hasCollision = false;
+    
+    for (const node of nodes) {
+      // Distanza minima richiesta tra i centri di due nodi
+      const minDistance = nodeWidth + spacing;
+      
+      // Distanza reale tra i centri dei nodi
+      const distance = Math.sqrt(
+        Math.pow(node.x - finalPosition.x, 2) + 
+        Math.pow(node.y - finalPosition.y, 2)
+      );
+      
+      // Se i nodi sono sullo stesso livello e troppo vicini
+      if (Math.abs(node.y - finalPosition.y) < 20 && distance < minDistance) {
+        // Sposta il nuovo nodo un po' più a destra
+        finalPosition.x = node.x + minDistance;
+        hasCollision = true;
+      }
+    }
+  } while (hasCollision);
+  
+  return finalPosition;
+};
+
+/**
+ * Funzione principale per il posizionamento di un nuovo nodo nel grafo
+ * Calcola la posizione e gli spostamenti necessari per mantenere un layout ordinato
+ * 
+ * @param {Object} canvasData - Dati del canvas contenenti nodi e connessioni
+ * @param {string|number} parentId - ID del nodo genitore
+ * @return {Object} - Dati del canvas aggiornati con nuove posizioni
+ */
+export const getOptimalNodePlacement = (canvasData, parentId) => {
+  if (!canvasData || !parentId) return canvasData;
+  
+  const { nodes, connections } = canvasData;
+  
+  // Calcola la posizione ottimale per il nuovo nodo
+  const newNodePosition = calculateNodePosition(nodes, connections, parentId);
+  
+  // Calcola gli spostamenti per i nodi esistenti
+  const shifts = calculateShiftsForExistingNodes(
+    nodes, 
+    connections, 
+    nodes.filter(node => 
+      connections.some(conn => conn.fromId === parentId && conn.toId === node.id)
+    ), 
+    newNodePosition
+  );
+  
+  // Applica gli spostamenti ai nodi esistenti
+  const updatedNodes = nodes.map(node => {
+    if (shifts[node.id]) {
+      return {
+        ...node,
+        x: shifts[node.id].x,
+        y: shifts[node.id].y
+      };
+    }
+    return node;
+  });
+  
+  return {
+    ...canvasData,
+    nodes: updatedNodes,
+    newNodePosition  // Aggiungiamo la posizione calcolata per il nuovo nodo
+  };
+};
+
+/**
+ * Crea un nuovo nodo con posizionamento intelligente
+ * 
+ * @param {Object} canvasData - Dati del canvas
+ * @param {string|number} parentId - ID del nodo genitore
+ * @param {Object} nodeData - Dati del nuovo nodo (senza coordinate)
+ * @return {Object} - Dati del canvas aggiornati con il nuovo nodo
+ */
+export const createNodeWithOptimalPosition = (canvasData, parentId, nodeData) => {
+  if (!canvasData || !parentId) return canvasData;
+  
+  // Calcola la posizione ottimale
+  const position = calculateNodePosition(
+    canvasData.nodes, 
+    canvasData.connections, 
+    parentId
+  );
+  
+  // Crea il nuovo nodo con la posizione calcolata
+  const newNode = {
+    id: Date.now(), // o usa un altro metodo per generare ID unici
+    ...nodeData,
+    x: position.x,
+    y: position.y
+  };
+  
+  // Crea la connessione dal genitore al nuovo nodo
+  const newConnection = {
+    id: `conn-${Date.now()}`,
+    fromId: parentId,
+    toId: newNode.id
+  };
+  
+  // Aggiorna i dati del canvas
+  return {
+    ...canvasData,
+    nodes: [...canvasData.nodes, newNode],
+    connections: [...canvasData.connections, newConnection]
+  };
+};
