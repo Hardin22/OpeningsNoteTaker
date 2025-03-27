@@ -1,0 +1,391 @@
+{
+  "nodes": [
+    {
+      "id": 1743025010552,
+      "x": 324,
+      "y": -418,
+      "label": "e4",
+      "description": "",
+      "type": "move",
+      "fenPosition": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    {
+      "id": 1743025019556,
+      "label": "c5",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5",
+      "x": 324,
+      "y": -318
+    },
+    {
+      "id": 1743025023311,
+      "label": "Nf3",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3",
+      "x": 324,
+      "y": -218
+    },
+    {
+      "id": 1743025024699,
+      "label": "d6",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6",
+      "x": 324,
+      "y": -118
+    },
+    {
+      "id": 1743025025457,
+      "label": "d4",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4",
+      "x": 324,
+      "y": -18
+    },
+    {
+      "id": 1743025025906,
+      "label": "cxd4",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4",
+      "x": 324,
+      "y": 82
+    },
+    {
+      "id": 1743025026788,
+      "label": "Nxd4",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4",
+      "x": 324,
+      "y": 182
+    },
+    {
+      "id": 1743025028813,
+      "label": "Nf6",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6",
+      "x": 324,
+      "y": 282
+    },
+    {
+      "id": 1743025029873,
+      "label": "Nc3",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3",
+      "x": 324,
+      "y": 382
+    },
+    {
+      "id": 1743025030905,
+      "label": "g6",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6",
+      "x": 324,
+      "y": 482
+    },
+    {
+      "id": 1743025031847,
+      "label": "Be3",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3",
+      "x": 324,
+      "y": 582
+    },
+    {
+      "id": 1743025032720,
+      "label": "Bg7",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7",
+      "x": 324,
+      "y": 682
+    },
+    {
+      "id": 1743025035017,
+      "label": "f3",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3",
+      "x": 324,
+      "y": 782
+    },
+    {
+      "id": 1743025037262,
+      "label": "O-O",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O",
+      "x": 324,
+      "y": 882
+    },
+    {
+      "id": 1743025037961,
+      "label": "Qd2",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O 8. Qd2",
+      "x": 324,
+      "y": 982
+    },
+    {
+      "id": 1743025047208,
+      "label": "Nc6",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O 8. Qd2 Nc6",
+      "x": 324,
+      "y": 1082
+    },
+    {
+      "id": 1743025049375,
+      "label": "O-O-O",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3 O-O 8. Qd2 Nc6 9. O-O-O",
+      "x": 324,
+      "y": 1182
+    },
+    {
+      "id": 1743025604334,
+      "label": "f3",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3",
+      "x": 459,
+      "y": 382
+    },
+    {
+      "id": 1743025606412,
+      "label": "g6",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6",
+      "x": 459,
+      "y": 482
+    },
+    {
+      "id": 1743025607364,
+      "label": "c4",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6 6. c4",
+      "x": 459,
+      "y": 582
+    },
+    {
+      "id": 1743025608921,
+      "label": "Bg7",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6 6. c4 Bg7",
+      "x": 459,
+      "y": 682
+    },
+    {
+      "id": 1743025614571,
+      "label": "Be3",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6 6. c4 Bg7 7. Be3",
+      "x": 459,
+      "y": 782
+    },
+    {
+      "id": 1743025624318,
+      "label": "O-O",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6 6. c4 Bg7 7. Be3 O-O",
+      "x": 459,
+      "y": 882
+    },
+    {
+      "id": 1743025626568,
+      "label": "Qd2",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6 6. c4 Bg7 7. Be3 O-O 8. Qd2",
+      "x": 459,
+      "y": 982
+    },
+    {
+      "id": 1743025631655,
+      "label": "Nc6",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6 6. c4 Bg7 7. Be3 O-O 8. Qd2 Nc6",
+      "x": 459,
+      "y": 1082
+    },
+    {
+      "id": 1743025633819,
+      "label": "Nc3",
+      "type": "move",
+      "description": "",
+      "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6 6. c4 Bg7 7. Be3 O-O 8. Qd2 Nc6 9. Nc3",
+      "x": 459,
+      "y": 1182
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn-1743025019556",
+      "fromId": 1743025010552,
+      "toId": 1743025019556
+    },
+    {
+      "id": "conn-1743025023311",
+      "fromId": 1743025019556,
+      "toId": 1743025023311
+    },
+    {
+      "id": "conn-1743025024699",
+      "fromId": 1743025023311,
+      "toId": 1743025024699
+    },
+    {
+      "id": "conn-1743025025457",
+      "fromId": 1743025024699,
+      "toId": 1743025025457
+    },
+    {
+      "id": "conn-1743025025906",
+      "fromId": 1743025025457,
+      "toId": 1743025025906
+    },
+    {
+      "id": "conn-1743025026788",
+      "fromId": 1743025025906,
+      "toId": 1743025026788
+    },
+    {
+      "id": "conn-1743025028813",
+      "fromId": 1743025026788,
+      "toId": 1743025028813
+    },
+    {
+      "id": "conn-1743025029873",
+      "fromId": 1743025028813,
+      "toId": 1743025029873
+    },
+    {
+      "id": "conn-1743025030905",
+      "fromId": 1743025029873,
+      "toId": 1743025030905
+    },
+    {
+      "id": "conn-1743025031847",
+      "fromId": 1743025030905,
+      "toId": 1743025031847
+    },
+    {
+      "id": "conn-1743025032720",
+      "fromId": 1743025031847,
+      "toId": 1743025032720
+    },
+    {
+      "id": "conn-1743025035017",
+      "fromId": 1743025032720,
+      "toId": 1743025035017
+    },
+    {
+      "id": "conn-1743025037262",
+      "fromId": 1743025035017,
+      "toId": 1743025037262
+    },
+    {
+      "id": "conn-1743025037961",
+      "fromId": 1743025037262,
+      "toId": 1743025037961
+    },
+    {
+      "id": "conn-1743025047208",
+      "fromId": 1743025037961,
+      "toId": 1743025047208
+    },
+    {
+      "id": "conn-1743025049375",
+      "fromId": 1743025047208,
+      "toId": 1743025049375
+    },
+    {
+      "id": "conn-1743025604334",
+      "fromId": 1743025028813,
+      "toId": 1743025604334
+    },
+    {
+      "id": "conn-1743025606412",
+      "fromId": 1743025604334,
+      "toId": 1743025606412
+    },
+    {
+      "id": "conn-1743025607364",
+      "fromId": 1743025606412,
+      "toId": 1743025607364
+    },
+    {
+      "id": "conn-1743025608921",
+      "fromId": 1743025607364,
+      "toId": 1743025608921
+    },
+    {
+      "id": "conn-1743025614571",
+      "fromId": 1743025608921,
+      "toId": 1743025614571
+    },
+    {
+      "id": "conn-1743025624318",
+      "fromId": 1743025614571,
+      "toId": 1743025624318
+    },
+    {
+      "id": "conn-1743025626568",
+      "fromId": 1743025624318,
+      "toId": 1743025626568
+    },
+    {
+      "id": "conn-1743025631655",
+      "fromId": 1743025626568,
+      "toId": 1743025631655
+    },
+    {
+      "id": "conn-1743025633819",
+      "fromId": 1743025631655,
+      "toId": 1743025633819
+    }
+  ],
+  "annotations": [
+    {
+      "id": 1742999511487,
+      "x": -27,
+      "y": 27,
+      "width": 158,
+      "height": 50,
+      "text": "difesa siciliana, che sbatti"
+    },
+    {
+      "id": 1743005250503,
+      "x": 633,
+      "y": -168,
+      "width": 176,
+      "height": 70,
+      "text": "hai capito che casino questo gioca una bucchina di anti sicilian"
+    },
+    {
+      "id": 1743005290738,
+      "x": 697,
+      "y": -97,
+      "width": 181,
+      "height": 57,
+      "text": "qua te sta accort è nu bucchin e gambett"
+    }
+  ]
+}

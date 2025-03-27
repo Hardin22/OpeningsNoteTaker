@@ -254,7 +254,7 @@ const Node = ({
     } else if (isHovered) {
         nodeClass += ' bg-gradient-to-br from-blue-400 to-indigo-600 text-white';
     } else {
-        nodeClass += ' bg-gradient-to-br from-slate-700 to-slate-900 text-slate-100';
+        nodeClass += ' bg-slate-700  text-slate-100  border-slate-900';
     }
 
     // Effetto extra quando si trascina
@@ -305,6 +305,7 @@ const Node = ({
                         )}
                     </div>
                 ) : (
+                    // Qui inserisci il rendering del nodo in modalità "non editing"
                     <div className="flex flex-col items-center justify-center w-full h-full">
                         {node.label ? (
                             <span className="text-white font-medium text-sm break-words p-1 text-center leading-tight">
@@ -314,11 +315,6 @@ const Node = ({
                             <span className="text-white/50 text-xs italic p-1">
                                 {isHovered ? 'Doppio click per modificare' : ''}
                             </span>
-                        )}
-                        {isSelected && (
-                            <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs text-white/70 bg-black/50 px-1 rounded">
-                                9: aggiungi | x: elimina | \: elimina con figli
-                            </div>
                         )}
                     </div>
                 )}

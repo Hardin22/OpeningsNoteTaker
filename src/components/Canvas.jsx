@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import Node from './Node';
 import Connection from './Connection';
 import Annotation from './Annotation';
+import { reorganizeCanvasNodes } from '../utils/layoutUtils';
 import {
     isValidChessMove,
     buildMovePath,
@@ -21,12 +22,13 @@ const Canvas = ({
     onGeneratePGN,
 }) => {
     const canvasRef = useRef(null);
+    const containerRef = useRef(null);
     const [isDraggingNode, setIsDraggingNode] = useState(false);
     const [isDraggingAnnotation, setIsDraggingAnnotation] = useState(false);
     const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
     const [canvasPosition, setCanvasPosition] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
     const lastMousePosition = useRef({ x: 0, y: 0 });
-    const containerRef = useRef(null);
 
     // All'avvio carichiamo i dati salvati da localStorage
     useEffect(() => {
@@ -36,44 +38,85 @@ const Canvas = ({
         }
     }, [setCanvasData]);
 
-    // Auto-salvataggio ogni 15 secondi
+    // Auto-salvataggio ogni 15 secondi su localStorage
     useEffect(() => {
         const interval = setInterval(() => {
-            localStorage.setItem('canvasData', JSON.stringify(canvasData));
-            console.log('Canvas data salvato automaticamente');
+            const leafNodes = canvasData.nodes.filter(
+                (node) => !canvasData.connections.some((conn) => conn.fromId === node.id)
+            );
+
+            const fullLines = leafNodes
+                .map((node) => node.pgn)
+                .filter((pgn) => pgn && pgn.trim() !== '');
+
+            const dataToSave = {
+                ...canvasData,
+                fullLines: fullLines,
+            };
+
+            localStorage.setItem('canvasData', JSON.stringify(dataToSave));
+            console.log('Dati salvati con fullLines nel localStorage');
         }, 15000);
         return () => clearInterval(interval);
-    }, [canvasData]);
+    }, [canvasData]); // Aggiungi canvasData come dipendenza
+
+    // Funzione per esportare i dati del canvas e scaricarli come file JSON
+    // Modifica alla funzione exportCanvasToFile
+    const exportCanvasToFile = () => {
+        // Identifica i nodi foglia (senza figli)
+        const leafNodes = canvasData.nodes.filter(
+            (node) => !canvasData.connections.some((conn) => conn.fromId === node.id)
+        );
+
+        // Estrae i PGN validi dai nodi foglia
+        const fullLines = leafNodes
+            .map((node) => node.pgn)
+            .filter((pgn) => pgn && pgn.trim() !== '');
+
+        // Crea l'oggetto dati con le full lines
+        const exportData = {
+            ...canvasData,
+            fullLines: fullLines,
+        };
+
+        const jsonData = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'canvasData.json';
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
+    };
 
     // Funzione per aggiornare un nodo
     const updateNode = (updatedNode) => {
         const originalNode = canvasData.nodes.find((n) => n.id === updatedNode.id);
 
-        // Se stiamo cambiando la label e questa non è vuota
         if (
             updatedNode.label !== originalNode?.label &&
             updatedNode.label &&
             updatedNode.label.trim() !== ''
         ) {
-            // Verifica se è una mossa valida nel contesto
             const isValid = validateNodeUpdate(updatedNode);
-
             if (!isValid) {
-                // Feedback all'utente più dettagliato
                 const playerTurn = getNodeColor(
                     canvasData.nodes,
                     canvasData.connections,
                     updatedNode.id
                 );
                 const playerName = playerTurn === 'w' ? 'Bianco' : 'Nero';
-
                 alert(
                     `La mossa "${updatedNode.label}" non è valida in questa posizione.\nÈ il turno del ${playerName}.`
                 );
                 return false;
             }
-
-            // Se la mossa è valida, calcola la posizione FEN
             updatedNode.fenPosition = calculateFenPosition(
                 canvasData.nodes,
                 canvasData.connections,
@@ -81,13 +124,11 @@ const Canvas = ({
             );
         }
 
-        // Aggiorna il nodo
         setCanvasData((prev) => ({
             ...prev,
             nodes: prev.nodes.map((node) => (node.id === updatedNode.id ? updatedNode : node)),
         }));
 
-        // Se stiamo modificando il nodo selezionato, aggiorna anche quello
         if (selectedNodeId === updatedNode.id) {
             const movePath = buildMovePath(
                 canvasData.nodes,
@@ -96,18 +137,12 @@ const Canvas = ({
             );
             if (onGeneratePGN) onGeneratePGN(movePath);
         }
-
         return true;
     };
 
     // Funzione per validare l'aggiornamento di un nodo
     const validateNodeUpdate = (updatedNode) => {
-        // Se la label è vuota, non c'è niente da validare
-        if (!updatedNode.label || updatedNode.label.trim() === '') {
-            return true;
-        }
-
-        // Verifica se la mossa è valida nel contesto dell'albero
+        if (!updatedNode.label || updatedNode.label.trim() === '') return true;
         return isValidChessMove(
             updatedNode.label,
             canvasData.nodes,
@@ -118,99 +153,71 @@ const Canvas = ({
 
     // Funzione per aggiungere un nodo figlio
     const handleAddChildNode = (parentId) => {
-        // Trova il nodo genitore
         const parentNode = canvasData.nodes.find((node) => node.id === parentId);
         if (!parentNode) return;
-
-        // Crea un nuovo nodo figlio posizionato leggermente sotto e a destra del genitore
         const childNode = {
             id: Date.now(),
             x: parentNode.x + 150,
             y: parentNode.y + 50,
             label: '',
             description: '',
-            // Aggiungiamo un riferimento esplicito al padre
             parentId: parentId,
         };
-
-        // Crea una nuova connessione
         const newConnection = {
             id: `${parentId}-${childNode.id}`,
             fromId: parentId,
             toId: childNode.id,
         };
-
-        // Aggiungi il nodo e la connessione
         setCanvasData((prev) => ({
             ...prev,
             nodes: [...prev.nodes, childNode],
             connections: [...(prev.connections || []), newConnection],
         }));
-
-        // Seleziona il nuovo nodo
         if (onNodeSelect) onNodeSelect(childNode.id);
     };
+    const handleReorganizeNodes = () => {
+        const updatedCanvasData = reorganizeCanvasNodes(canvasData);
+        setCanvasData(updatedCanvasData);
+    };
 
-    // NUOVA FUNZIONE: Gestisce l'eliminazione di un nodo (con o senza figli)
+    // Funzione per eliminare un nodo (con o senza figli)
     const handleDeleteNode = (nodeId, isRecursive) => {
         if (!nodeId || !canvasData) return;
 
         if (isRecursive) {
-            // Eliminazione ricorsiva del nodo e di tutti i suoi figli
             const nodesToDelete = new Set();
-
-            // Funzione ricorsiva per trovare tutti i nodi da eliminare
             const findDescendants = (id) => {
                 nodesToDelete.add(id);
-
-                // Trova tutte le connessioni dove questo nodo è genitore
                 const childConnections = canvasData.connections.filter(
                     (conn) => conn.fromId === id
                 );
-
-                // Per ogni figlio, trova ricorsivamente i suoi discendenti
                 childConnections.forEach((conn) => {
                     findDescendants(conn.toId);
                 });
             };
-
-            // Inizia la ricerca dei discendenti
             findDescendants(nodeId);
-
-            // Filtra i nodi e le connessioni da mantenere
             const filteredNodes = canvasData.nodes.filter((node) => !nodesToDelete.has(node.id));
             const filteredConnections = canvasData.connections.filter(
                 (conn) => !nodesToDelete.has(conn.fromId) && !nodesToDelete.has(conn.toId)
             );
-
-            // Aggiorna il canvas
             setCanvasData({
                 ...canvasData,
                 nodes: filteredNodes,
                 connections: filteredConnections,
             });
-
-            // Se il nodo selezionato è stato eliminato, deselezionalo
             if (selectedNodeId && nodesToDelete.has(selectedNodeId)) {
                 onNodeSelect(null);
             }
         } else {
-            // Eliminazione semplice (solo il nodo specificato)
             const filteredNodes = canvasData.nodes.filter((node) => node.id !== nodeId);
-
-            // Rimuovi anche le connessioni che coinvolgono questo nodo
             const filteredConnections = canvasData.connections.filter(
                 (conn) => conn.fromId !== nodeId && conn.toId !== nodeId
             );
-
-            // Aggiorna il canvas
             setCanvasData({
                 ...canvasData,
                 nodes: filteredNodes,
                 connections: filteredConnections,
             });
-
-            // Se il nodo selezionato è stato eliminato, deselezionalo
             if (selectedNodeId === nodeId) {
                 onNodeSelect(null);
             }
@@ -243,29 +250,25 @@ const Canvas = ({
         }
     };
 
-    // Gestione stato di trascinamento nodo
+    // Gestione dello stato di trascinamento del nodo
     const handleNodeDragStart = () => {
         setIsDraggingNode(true);
     };
-
     const handleNodeDragEnd = () => {
         setIsDraggingNode(false);
     };
 
-    // Gestione stato di trascinamento annotazione
+    // Gestione dello stato di trascinamento dell'annotazione
     const handleAnnotationDragStart = () => {
         setIsDraggingAnnotation(true);
     };
-
     const handleAnnotationDragEnd = () => {
         setIsDraggingAnnotation(false);
     };
 
     // Gestione dello spostamento del canvas
     const handleCanvasMouseDown = (e) => {
-        // Se stiamo trascinando un elemento o l'evento non è sul canvas, non fare nulla
         if (isDraggingNode || isDraggingAnnotation || e.target !== canvasRef.current) return;
-
         setIsDraggingCanvas(true);
         lastMousePosition.current = { x: e.clientX, y: e.clientY };
         e.preventDefault();
@@ -273,37 +276,63 @@ const Canvas = ({
 
     const handleCanvasMouseMove = (e) => {
         if (!isDraggingCanvas) return;
-
         const dx = e.clientX - lastMousePosition.current.x;
         const dy = e.clientY - lastMousePosition.current.y;
-
         setCanvasPosition((prev) => ({
             x: prev.x + dx,
             y: prev.y + dy,
         }));
-
         lastMousePosition.current = { x: e.clientX, y: e.clientY };
     };
 
     const handleCanvasMouseUp = () => {
         setIsDraggingCanvas(false);
     };
+    const handleDeleteAnnotation = (annotationId) => {
+        if (!annotationId || !canvasData) return;
+
+        // Chiedi conferma all'utente
+        if (window.confirm('Sei sicuro di voler eliminare questa annotazione?')) {
+            // Rimuovi l'annotazione dal canvasData
+            setCanvasData({
+                ...canvasData,
+                annotations: canvasData.annotations.filter((ann) => ann.id !== annotationId),
+            });
+
+            // Deseleziona l'annotazione corrente
+            if (selectedAnnotationId === annotationId && onAnnotationSelect) {
+                onAnnotationSelect(null);
+            }
+        }
+    };
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Intercetta il tasto "\" (backslash)
+            if (e.key === '\\') {
+                // Se c'è un'annotazione selezionata, eliminala
+                if (selectedAnnotationId) {
+                    e.preventDefault();
+                    handleDeleteAnnotation(selectedAnnotationId);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [selectedAnnotationId, canvasData]);
 
     // Gestione dello scroll con la rotella del mouse
     const handleWheel = (e) => {
         if (isDraggingNode || isDraggingAnnotation) return;
-
-        // Previene il comportamento di default dello scroll
         e.preventDefault();
-
-        // Aggiorna la posizione del canvas in base alla direzione dello scroll
         setCanvasPosition((prev) => ({
             x: prev.x - e.deltaX,
             y: prev.y - e.deltaY,
         }));
     };
 
-    // Aggiungi gestori eventi per il movimento del canvas
     useEffect(() => {
         if (isDraggingCanvas) {
             window.addEventListener('mousemove', handleCanvasMouseMove);
@@ -312,20 +341,17 @@ const Canvas = ({
             window.removeEventListener('mousemove', handleCanvasMouseMove);
             window.removeEventListener('mouseup', handleCanvasMouseUp);
         }
-
         return () => {
             window.removeEventListener('mousemove', handleCanvasMouseMove);
             window.removeEventListener('mouseup', handleCanvasMouseUp);
         };
     }, [isDraggingCanvas]);
 
-    // Aggiungi gestione per lo scroll con la rotella
     useEffect(() => {
         const container = containerRef.current;
         if (container) {
             container.addEventListener('wheel', handleWheel, { passive: false });
         }
-
         return () => {
             if (container) {
                 container.removeEventListener('wheel', handleWheel);
@@ -335,7 +361,15 @@ const Canvas = ({
 
     return (
         <div ref={containerRef} className="w-full h-full flex-1 relative overflow-hidden">
-            {/* Background grid fisso che si muove con il canvas */}
+            {/* Pulsante per esportare il canvas */}
+            <div className="absolute top-2 right-2 z-50">
+                <button
+                    onClick={exportCanvasToFile}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+                >
+                    Esporta JSON
+                </button>
+            </div>
             <div
                 className="absolute inset-0 w-full h-full z-0"
                 style={{
@@ -344,8 +378,66 @@ const Canvas = ({
                     backgroundPosition: `${canvasPosition.x % 20}px ${canvasPosition.y % 20}px`,
                 }}
             />
-
-            {/* Canvas trascinabile con dimensioni grandi abbastanza per tutte le connessioni */}
+            <div className="absolute bottom-4 right-4 group z-50">
+                <button className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full shadow-lg focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-6 w-6">
+                        <text
+                            x="50%"
+                            y="50%"
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fontSize="20"
+                            fill="currentColor"
+                        >
+                            ⌘
+                        </text>
+                    </svg>
+                </button>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none absolute bottom-full right-0 mb-2 bg-black/70 text-white text-sm px-6 py-1 rounded min-w-[250px] whitespace-pre-line">
+                    Shortcuts:
+                    <br />
+                    9: aggiungi Nodo
+                    <br />
+                    x: elimina Nodo
+                    <br />
+                    \: elimina Nodo con figli
+                </div>
+            </div>
+            {/* Nuovi pulsanti per zoom */}
+            <div className="absolute bottom-4 right-20 z-50 flex space-x-1">
+                <button
+                    onClick={handleReorganizeNodes}
+                    className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
+                    title="Riorganizza Nodi"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                        />
+                    </svg>
+                </button>
+                <button
+                    onClick={() => setZoom((prev) => Math.min(prev + 0.1, 2))}
+                    className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
+                >
+                    +
+                </button>
+                <button
+                    onClick={() => setZoom((prev) => Math.max(prev - 0.1, 0.3))}
+                    className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
+                >
+                    −
+                </button>
+            </div>
             <div
                 ref={canvasRef}
                 className="absolute"
@@ -354,18 +446,16 @@ const Canvas = ({
                     height: '20000px',
                     left: '-10000px',
                     top: '-10000px',
-                    transform: `translate(${canvasPosition.x}px, ${canvasPosition.y}px)`,
+                    transform: `translate(${canvasPosition.x}px, ${canvasPosition.y}px) scale(${zoom})`,
                     cursor: isDraggingCanvas ? 'grabbing' : 'grab',
                 }}
                 onClick={handleCanvasClick}
                 onMouseDown={handleCanvasMouseDown}
             >
-                {/* Renderizza le connessioni */}
                 {canvasData?.connections?.map((connection) => {
                     const fromNode = canvasData.nodes.find((node) => node.id === connection.fromId);
                     const toNode = canvasData.nodes.find((node) => node.id === connection.toId);
                     if (!fromNode || !toNode) return null;
-
                     return (
                         <Connection
                             key={connection.id}
@@ -383,8 +473,6 @@ const Canvas = ({
                         />
                     );
                 })}
-
-                {/* Renderizza i nodi */}
                 {canvasData?.nodes?.map((node) => (
                     <Node
                         key={node.id}
@@ -407,11 +495,9 @@ const Canvas = ({
                         onDragEnd={handleNodeDragEnd}
                         canvasData={canvasData}
                         onGeneratePGN={onGeneratePGN}
-                        onDeleteNode={handleDeleteNode} // NUOVA PROP: passa la funzione di eliminazione
+                        onDeleteNode={handleDeleteNode}
                     />
                 ))}
-
-                {/* Renderizza le annotazioni */}
                 {canvasData?.annotations?.map((annotation) => (
                     <Annotation
                         key={annotation.id}

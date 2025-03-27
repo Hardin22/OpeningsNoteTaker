@@ -44,6 +44,8 @@ const ChessboardPopup = ({
     const isUpdatingRef = useRef(false);
     // Stato del popup (mounted/unmounted)
     const isMountedRef = useRef(true);
+    const [childrenOptions, setChildrenOptions] = useState([]);
+    const [showChildSelector, setShowChildSelector] = useState(false);
 
     // NUOVO: Funzioni wrapper sicure per gli aggiornamenti
     const safeUpdateCanvas = useCallback(
@@ -216,19 +218,8 @@ const ChessboardPopup = ({
 
     // Vai alla posizione iniziale
     const goToStart = () => {
-        // Trova il nodo radice (quello senza un genitore)
-        const rootNodeId = Object.keys(parentNodeMap.current).find(
-            (nodeId) =>
-                !parentNodeMap.current[nodeId] ||
-                !Object.values(parentNodeMap.current).includes(nodeId)
-        );
-
-        if (rootNodeId) {
-            navigateToNode(rootNodeId);
-        } else {
-            // Fallback: naviga alla prima mossa
-            navigateToMove(-1);
-        }
+        // Semplicemente torna alla posizione iniziale (prima di qualsiasi mossa)
+        navigateToMove(-1);
     };
 
     // Vai al nodo genitore diretto
@@ -245,8 +236,48 @@ const ChessboardPopup = ({
 
     // Vai alla prossima mossa (se siamo in una sequenza lineare)
     const goToNext = () => {
-        // Se siamo in una sequenza lineare, prosegui normalmente
-        currentIndex < moveHistory.length - 1 && navigateToMove(currentIndex + 1);
+        // Se abbiamo mosse rimanenti nella sequenza lineare, prosegui normalmente
+        if (currentIndex < moveHistory.length - 1) {
+            navigateToMove(currentIndex + 1);
+            return;
+        }
+
+        // Altrimenti, cerca figli diretti del nodo selezionato nel grafo
+        if (selectedNodeId && internalCanvasData) {
+            // Trova tutti i figli del nodo corrente
+            const childConnections = internalCanvasData.connections.filter(
+                (conn) => conn.fromId === selectedNodeId
+            );
+
+            if (childConnections.length === 0) {
+                // Nessun figlio disponibile
+                return;
+            }
+
+            // Prepara opzioni di figli
+            const childOptions = childConnections.map((conn) => {
+                const childNode = internalCanvasData.nodes.find((node) => node.id === conn.toId);
+                return {
+                    id: conn.toId,
+                    label: childNode ? childNode.label : 'Mossa sconosciuta',
+                };
+            });
+
+            if (childOptions.length === 1) {
+                // Se c'è un solo figlio, naviga direttamente
+                navigateToNode(childOptions[0].id);
+            } else if (childOptions.length > 1) {
+                // Se ci sono più figli, mostra il dialog di selezione
+                setChildrenOptions(childOptions);
+                setShowChildSelector(true);
+            }
+        }
+    };
+
+    // Funzione per gestire la selezione di un nodo figlio
+    const handleChildSelect = (nodeId) => {
+        setShowChildSelector(false);
+        navigateToNode(nodeId);
     };
 
     // Vai all'ultima posizione
@@ -262,72 +293,108 @@ const ChessboardPopup = ({
     };
 
     // NUOVA IMPLEMENTAZIONE ROBUSTA per il drop delle mosse
-        const handlePieceDrop = (sourceSquare, targetSquare) => {
-            isUpdatingRef.current = true;
+    // NUOVA IMPLEMENTAZIONE ROBUSTA per il drop delle mosse
+    const handlePieceDrop = (sourceSquare, targetSquare) => {
+        console.log('===== NUOVO DROP =====');
+        try {
+            // Esegui la mossa
+            const moveObj = { from: sourceSquare, to: targetSquare, promotion: 'q' };
+            const result = gameRef.current.move(moveObj);
 
-            try {
-                const moveObj = {
-                    from: sourceSquare,
-                    to: targetSquare,
-                    promotion: 'q',
-                };
-
-                const result = gameRef.current.move(moveObj);
-                if (!result) {
-                    isUpdatingRef.current = false;
-                    return false;
-                }
-
-                const newPosition = gameRef.current.fen();
-                setPosition(newPosition);
-
-                const newHistory = [...moveHistory.slice(0, currentIndex + 1), result];
-                setMoveHistory(newHistory);
-                setCurrentIndex(currentIndex + 1);
-
-                // Aggiungi il nodo se necessario
-                if (internalCanvasData && selectedNodeId) {
-                    // Usa setTimeout per ritardare l'aggiornamento e prevenire race conditions
-                    setTimeout(() => {
-                        const updatedCanvas = createNodeWithOptimalPosition(
-                            internalCanvasData,
-                            selectedNodeId,
-                            {
-                                label: result.san,
-                                type: 'move',
-                                description: '',
-                                pgn: gameRef.current.pgn(),
-                            }
-                        );
-
-                        // Aggiorna lo stato interno
-                        setInternalCanvasData(updatedCanvas);
-
-                        // Usa la nuova funzione per aggiornare canvas e selezionare nodo in un'unica operazione
-                        if (onUpdateCanvasAndSelectNode) {
-                            const newNodeId =
-                                updatedCanvas.nodes[updatedCanvas.nodes.length - 1]?.id;
-                            onUpdateCanvasAndSelectNode(updatedCanvas, newNodeId);
-                        } else {
-                            // Fallback al vecchio metodo se la nuova prop non è disponibile
-                            safeUpdateCanvas(updatedCanvas);
-
-                            // NON chiamare safeSelectNode qui - questo è ciò che causava il problema
-                        }
-
-                        isUpdatingRef.current = false;
-                    }, 50);
-                } else {
-                    isUpdatingRef.current = false;
-                }
-
-                return true;
-            } catch (error) {
-                console.error("Errore nell'esecuzione della mossa:", error);
-                isUpdatingRef.current = false;
+            if (!result) {
+                console.log('Mossa non valida');
                 return false;
             }
-        };
+
+            console.log('Mossa eseguita:', result.san);
+
+            // Aggiorna la scacchiera
+            setPosition(gameRef.current.fen());
+
+            // Se non abbiamo dati canvas o un nodo selezionato, usciamo qui
+            if (!internalCanvasData || !selectedNodeId) {
+                console.log('Nessun canvas o nodo selezionato');
+                return true;
+            }
+
+            console.log('Nodo selezionato:', selectedNodeId);
+            console.log('Posizione corrente FEN:', gameRef.current.fen());
+
+            // 1. Trova tutti i figli diretti del nodo selezionato
+            const childConnections = internalCanvasData.connections.filter(
+                (conn) => conn.fromId === selectedNodeId
+            );
+            console.log('Connessioni figlie trovate:', childConnections.length);
+
+            const childNodeIds = childConnections.map((conn) => conn.toId);
+            console.log('ID dei nodi figli:', childNodeIds);
+
+            // 2. Cerca tra i figli uno con la stessa etichetta della mossa
+            let matchingNodeId = null;
+
+            // Debug: Stampa tutti i figli e le loro etichette
+            console.log('Dettagli dei nodi figli:');
+            for (const childId of childNodeIds) {
+                const childNode = internalCanvasData.nodes.find((node) => node.id === childId);
+                console.log(`Nodo ${childId}:`, childNode ? childNode.label : 'non trovato');
+
+                if (childNode && childNode.label === result.san) {
+                    matchingNodeId = childId;
+                    console.log(
+                        `TROVATA CORRISPONDENZA: Nodo ${childId} ha etichetta "${childNode.label}"`
+                    );
+                }
+            }
+
+            // Aggiorna la storia delle mosse
+            const newHistory = [...moveHistory.slice(0, currentIndex + 1), result];
+            setMoveHistory(newHistory);
+            setCurrentIndex(currentIndex + 1);
+
+            // 3. Se esiste, naviga ad esso
+            if (matchingNodeId) {
+                console.log(
+                    `[PERCORSO ESISTENTE] Usando nodo ${matchingNodeId} per la mossa ${result.san}`
+                );
+                console.log('Chiamando safeSelectNode con ID:', matchingNodeId);
+
+                // Importante: esplicitamente non creare un nuovo nodo
+                safeSelectNode(matchingNodeId);
+                return true;
+            }
+
+            // 4. Altrimenti crea un nuovo nodo
+            console.log(`[NUOVO NODO] Creando un nuovo nodo per la mossa ${result.san}`);
+            const updatedCanvas = createNodeWithOptimalPosition(
+                internalCanvasData,
+                selectedNodeId,
+                {
+                    label: result.san,
+                    type: 'move',
+                    description: '',
+                    pgn: gameRef.current.pgn(),
+                }
+            );
+
+            const newNodeId = updatedCanvas.nodes[updatedCanvas.nodes.length - 1]?.id;
+            console.log('Nuovo nodo creato con ID:', newNodeId);
+
+            if (onUpdateCanvasAndSelectNode) {
+                console.log('Usando onUpdateCanvasAndSelectNode');
+                onUpdateCanvasAndSelectNode(updatedCanvas, newNodeId);
+            } else {
+                console.log('Usando setInternalCanvasData + safeUpdateCanvas + safeSelectNode');
+                setInternalCanvasData(updatedCanvas);
+                safeUpdateCanvas(updatedCanvas);
+                safeSelectNode(newNodeId);
+            }
+
+            return true;
+        } catch (error) {
+            console.error("Errore nell'esecuzione della mossa:", error);
+            return false;
+        }
+    };
 
     // Salva la nota associata al nodo
     const saveNote = () => {
@@ -379,7 +446,24 @@ const ChessboardPopup = ({
         // Altrimenti, procedi con la chiusura
         onClose();
     };
+    const hasNextMoves = () => {
+        // Caso 1: Ci sono ancora mosse nella sequenza corrente
+        if (currentIndex < moveHistory.length - 1) {
+            return true;
+        }
 
+        // Caso 2: Non siamo all'ultima mossa della sequenza
+        if (!selectedNodeId || !internalCanvasData) {
+            return false;
+        }
+
+        // Caso 3: Controlla se il nodo selezionato ha figli nel grafo
+        const hasChildren = internalCanvasData.connections.some(
+            (conn) => conn.fromId === selectedNodeId
+        );
+
+        return hasChildren;
+    };
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm"
@@ -507,7 +591,7 @@ const ChessboardPopup = ({
                                     e.stopPropagation();
                                     goToNext();
                                 }}
-                                disabled={currentIndex >= moveHistory.length - 1}
+                                disabled={!hasNextMoves()} // Sostituisci la condizione precedente con questa
                                 className="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Mossa successiva"
                             >
@@ -556,8 +640,8 @@ const ChessboardPopup = ({
 
                     {/* Pannello laterale - [resto del codice invariato] */}
                     <div className="md:w-1/3 p-4 border-t md:border-t-0 md:border-l border-gray-700">
-                        <h3 className="text-lg font-medium text-white mb-3">Storico Mosse</h3>
-                        <div className="overflow-y-auto max-h-80 bg-gray-900 rounded p-3">
+                        <h3 className="text-lg font-medium text-white mb-3 ">Storico Mosse</h3>
+                        <div className="overflow-y-auto min-h-50 max-h-60 bg-gray-900 rounded p-3">
                             {moveHistory.length > 0 ? (
                                 <div className="grid grid-cols-2 gap-2">
                                     {moveHistory.map((move, index) => (
@@ -661,6 +745,46 @@ const ChessboardPopup = ({
                             <div className="mt-4 text-xs text-gray-400">
                                 <span className="italic">Nodo iniziale:</span> {initialNodeId}
                                 {initialNodeId === selectedNodeId ? ' (selezionato)' : ''}
+                            </div>
+                        )}
+                        {showChildSelector && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                                <div className="bg-gray-800 p-4 rounded-lg shadow-lg max-w-md w-full">
+                                    <h3 className="text-lg font-medium text-white mb-3">
+                                        Seleziona variante
+                                    </h3>
+                                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                                        {childrenOptions.map((child) => (
+                                            <button
+                                                key={child.id}
+                                                onClick={() => handleChildSelect(child.id)}
+                                                className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center"
+                                            >
+                                                <span className="flex-1">{child.label}</span>
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="h-5 w-5"
+                                                    viewBox="0 0 20 20"
+                                                    fill="currentColor"
+                                                >
+                                                    <path
+                                                        fillRule="evenodd"
+                                                        d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                                                        clipRule="evenodd"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-4 flex justify-end">
+                                        <button
+                                            onClick={() => setShowChildSelector(false)}
+                                            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-500"
+                                        >
+                                            Annulla
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>

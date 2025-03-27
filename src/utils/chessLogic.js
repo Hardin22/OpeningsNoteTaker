@@ -140,7 +140,7 @@ export const generatePGN = (movePath) => {
                 const result = chess.move(move);
                 if (result) {
                     movesSoFar++;
-                    console.log(`Mossa applicata: ${move}`);
+
                 } else {
                     console.error(`Mossa non valida nel percorso: ${move}`);
                     break;

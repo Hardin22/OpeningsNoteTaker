@@ -3,7 +3,7 @@ import Canvas from './components/Canvas';
 import Sidebar from './components/Sidebar';
 import { generatePGN } from './utils/chessLogic';
 import ChessboardPopup from './components/ChessboardPopup';
-
+import DrillMode from './components/DrillMode'; 
 function App() {
     // Stato iniziale del canvas
     const [canvasData, setCanvasData] = useState({
@@ -15,6 +15,7 @@ function App() {
     const [selectedNode, setSelectedNode] = useState(null);
     const [selectedAnnotation, setSelectedAnnotation] = useState(null);
     const [isChessboardOpen, setIsChessboardOpen] = useState(false);
+    const [isDrillModeOpen, setIsDrillModeOpen] = useState(false);
 
     // Refs
     const isGeneratingPGN = useRef(false);
@@ -44,6 +45,12 @@ function App() {
 
     // Funzione per generare PGN da un nodo
     const generatePGNFromNode = (canvasData, nodeId) => {
+        const selectedNode = canvasData.nodes.find((node) => node.id === nodeId);
+        // Se il nodo ha già il PGN salvato, usalo direttamente
+        if (selectedNode && selectedNode.pgn && selectedNode.pgn.trim() !== '') {
+            return selectedNode.pgn;
+        }
+        // Altrimenti ricostruisci il percorso e genera il PGN
         const movePath = buildMovePath(canvasData.nodes, canvasData.connections, nodeId);
         return generatePGN(movePath);
     };
@@ -215,6 +222,12 @@ function App() {
             return newCanvasData;
         });
     }, []);
+    const handleStartDrillMode = () => {
+        setIsDrillModeOpen(true);
+    };
+    const handleCloseDrillMode = () => {
+        setIsDrillModeOpen(false);
+    };
     
     // Nella sezione di rendering, passa la nuova prop al ChessboardPopup
     {isChessboardOpen && selectedNode && (
@@ -261,6 +274,8 @@ function App() {
                 canvasData={canvasData}
                 currentPGN={currentPGN}
                 onOpenChessboard={() => setIsChessboardOpen(true)}
+                onStartDrillMode={handleStartDrillMode} // Passa la nuova funzione
+                setCanvasData={setCanvasData}
             />
             <Canvas
                 canvasData={canvasData}
@@ -281,8 +296,13 @@ function App() {
                     selectedNodeId={selectedNode.id}
                     onUpdateCanvas={handleUpdateCanvasFromChessboard}
                     onSelectNode={handleNodeSelect}
-                    onUpdateCanvasAndSelectNode={handleUpdateCanvasAndSelectNode} // Nuova prop
+                    onUpdateCanvasAndSelectNode={handleUpdateCanvasAndSelectNode}
                 />
+            )}
+
+            {/* Mostra la modalità drill se attiva */}
+            {isDrillModeOpen && (
+                <DrillMode canvasData={canvasData} onClose={handleCloseDrillMode} />
             )}
         </div>
     );

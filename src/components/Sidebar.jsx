@@ -1,6 +1,5 @@
-// Aggiungi questa funzione e lo stile per la formattazione del PGN
-
 import React from 'react';
+import { useRef } from 'react';
 import PropTypes from 'prop-types';
 
 const Sidebar = ({
@@ -10,6 +9,8 @@ const Sidebar = ({
     updateNode,
     currentPGN,
     onOpenChessboard,
+    onStartDrillMode,
+    setCanvasData,
 }) => {
     const handleDescriptionChange = (e) => {
         if (selectedNode) {
@@ -19,7 +20,7 @@ const Sidebar = ({
             });
         }
     };
-
+    const fileInputRef = useRef(null);
     const copyPgnToClipboard = () => {
         if (currentPGN) {
             navigator.clipboard.writeText(currentPGN);
@@ -27,106 +28,229 @@ const Sidebar = ({
         }
     };
 
-    // Formatta il PGN per la visualizzazione
     const formatPGN = (pgn) => {
         if (!pgn) return '';
+        return pgn.replace(/\[\w+ ".*?"\]\n/g, '').trim();
+    };
+    const handleImportClick = () => {
+        fileInputRef.current.click();
+    };
 
-        // Rimuovi le intestazioni e mantieni solo le mosse
-        const movesOnly = pgn.replace(/\[\w+ ".*?"\]\n/g, '').trim();
-        return movesOnly;
+    // Gestisce l'importazione del file JSON
+    const handleFileImport = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const importedData = JSON.parse(event.target.result);
+
+                // Aggiorna il canvas con i dati importati
+                setCanvasData(importedData);
+
+                // Salva immediatamente i dati importati in localStorage
+                localStorage.setItem('canvasData', JSON.stringify(importedData));
+
+                alert('Dati importati con successo!');
+            } catch (error) {
+                console.error("Errore durante l'importazione:", error);
+                alert("Errore durante l'importazione. Controlla che il file sia un JSON valido.");
+            }
+
+            // Reset dell'input file
+            e.target.value = null;
+        };
+
+        reader.readAsText(file);
     };
 
     return (
-        <div className="w-64 h-full bg-gray-800 text-white p-4 flex flex-col space-y-4 overflow-auto">
-            <h2 className="text-xl font-bold mb-4">Toolbox</h2>
-            <button
-                onClick={onAddNode}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded transition-colors"
-            >
-                Inserisci Nodo
-            </button>
-            <button
-                onClick={onAddAnnotation}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded transition-colors"
-            >
-                Inserisci Annotazione
-            </button>
-            {/* Sezione dettagli nodo selezionato */}
-            {selectedNode && (
-                <div className="mt-8 border-t border-gray-700 pt-4">
-                    <h3 className="text-lg font-semibold mb-2">Dettagli Nodo</h3>
+        <div className="w-64 h-full bg-gray-800 text-gray-200 p-4 flex flex-col space-y-4 overflow-auto border-r border-gray-700">
+            <div className="space-y-4">
+                <h2 className="text-lg font-semibold text-gray-100 mb-2">Strumenti</h2>
 
-                    <div className="mb-3">
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                            Mossa
-                        </label>
-                        <input
-                            type="text"
-                            value={selectedNode.label || ''}
-                            onChange={(e) => updateNode({ ...selectedNode, label: e.target.value })}
-                            className="w-full bg-gray-700 text-white rounded px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="e4, Nf3..."
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">
-                            Descrizione
-                        </label>
-                        <textarea
-                            value={selectedNode.description || ''}
-                            onChange={handleDescriptionChange}
-                            rows={5}
-                            className="w-full bg-gray-700 text-white rounded px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                            placeholder="Inserisci una descrizione..."
-                        />
-                    </div>
-
-                    {/* Visualizza la posizione FEN se disponibile */}
-                    {selectedNode.fenPosition && (
-                        <div className="mt-3">
-                            <label className="block text-sm font-medium text-gray-300 mb-1">
-                                Posizione FEN
-                            </label>
-                            <div className="bg-gray-900 p-2 rounded text-xs overflow-x-auto break-all">
-                                {selectedNode.fenPosition}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-            {/* Visualizza il PGN se disponibile */}
-            {selectedNode && currentPGN && (
-                <div className="mt-3">
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="block text-sm font-medium text-gray-300">PGN</label>
-                        <button
-                            onClick={copyPgnToClipboard}
-                            className="text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded"
+                <div className="flex flex-col gap-2">
+                    <button
+                        onClick={onAddNode}
+                        className="w-full bg-gray-700 hover:bg-gray-600 text-gray-100 px-3 py-2 rounded-md transition-all text-sm flex items-center justify-center gap-1"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
                         >
-                            Copia
-                        </button>
-                    </div>
-                    <pre className="bg-gray-900 p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">
-                        {formatPGN(currentPGN)}
-                    </pre>
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 4v16m8-8H4"
+                            />
+                        </svg>
+                        Nuovo nodo
+                    </button>
+
+                    <button
+                        onClick={onAddAnnotation}
+                        className="w-full bg-gray-700 hover:bg-gray-600 text-gray-100 px-3 py-2 rounded-md transition-all text-sm flex items-center justify-center gap-1"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                            />
+                        </svg>
+                        Nuova annotazione
+                    </button>
                 </div>
-            )}
-            
-            <button
-                onClick={onOpenChessboard}
-                className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition-colors mb-3 flex items-center justify-center"
-            >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
+
+                {selectedNode && (
+                    <div className="pt-4 border-t border-gray-700">
+                        <h3 className="text-sm font-medium text-gray-100 mb-3">Modifica nodo</h3>
+
+                        <div className="space-y-3">
+                            <div>
+                                <label className="text-xs font-medium text-gray-400 mb-1 block">
+                                    Mossa
+                                </label>
+                                <input
+                                    type="text"
+                                    value={selectedNode.label || ''}
+                                    onChange={(e) =>
+                                        updateNode({ ...selectedNode, label: e.target.value })
+                                    }
+                                    className="w-full bg-gray-900 text-gray-100 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-gray-500 outline-none"
+                                    placeholder="Inserisci mossa..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-medium text-gray-400 mb-1 block">
+                                    Descrizione
+                                </label>
+                                <textarea
+                                    value={selectedNode.description || ''}
+                                    onChange={handleDescriptionChange}
+                                    rows={3}
+                                    className="w-full bg-gray-900 text-gray-100 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-gray-500 outline-none resize-none"
+                                    placeholder="Aggiungi note..."
+                                />
+                            </div>
+
+                            {selectedNode.fenPosition && (
+                                <div>
+                                    <label className="text-xs font-medium text-gray-400 mb-1 block">
+                                        FEN
+                                    </label>
+                                    <div className="bg-gray-900 p-2 rounded text-xs font-mono break-all text-gray-400">
+                                        {selectedNode.fenPosition}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {selectedNode && currentPGN && (
+                    <div className="pt-4 border-t border-gray-700">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-medium text-gray-400">PGN</span>
+                            <button
+                                onClick={copyPgnToClipboard}
+                                className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded-md text-gray-300"
+                            >
+                                Copia
+                            </button>
+                        </div>
+                        <pre className="bg-gray-900 p-2 rounded text-xs font-mono text-gray-400 overflow-x-auto whitespace-pre-wrap">
+                            {formatPGN(currentPGN)}
+                        </pre>
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-auto space-y-2 pt-4 border-t border-gray-700">
+                <button
+                    onClick={onOpenChessboard}
+                    className="w-full bg-gray-700 hover:bg-gray-600 text-gray-100 px-3 py-2 rounded-md transition-all text-sm flex items-center justify-center gap-2"
                 >
-                    <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z" />
-                </svg>
-                Visualizza Scacchiera <span className="text-xs ml-2">(Ctrl+B)</span>
-            </button>
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+                        />
+                    </svg>
+                    Scacchiera
+                </button>
+
+                <button
+                    onClick={onStartDrillMode}
+                    className="w-full bg-gray-700 hover:bg-gray-600 text-gray-100 px-3 py-2 rounded-md transition-all text-sm flex items-center justify-center gap-2 border border-gray-600"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 10V3L4 14h7v7l9-11h-7z"
+                        />
+                    </svg>
+                    Allenamento
+                </button>
+                <button
+                    onClick={handleImportClick}
+                    className="w-full bg-gray-700 hover:bg-gray-600 text-gray-100 px-3 py-2 rounded-md transition-all text-sm flex items-center justify-center gap-2 border border-gray-600"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                        />
+                    </svg>
+                    Importa JSON
+                </button>
+
+                {/* Input file nascosto */}
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileImport}
+                    accept=".json"
+                    style={{ display: 'none' }}
+                />
+            </div>
         </div>
     );
 };
@@ -134,17 +258,12 @@ const Sidebar = ({
 Sidebar.propTypes = {
     onAddNode: PropTypes.func.isRequired,
     onAddAnnotation: PropTypes.func.isRequired,
-    selectedNode: PropTypes.shape({
-        id: PropTypes.number.isRequired,
-        x: PropTypes.number.isRequired,
-        y: PropTypes.number.isRequired,
-        label: PropTypes.string,
-        description: PropTypes.string,
-        fenPosition: PropTypes.string,
-    }),
+    selectedNode: PropTypes.object,
     updateNode: PropTypes.func,
     currentPGN: PropTypes.string,
-    onOpenChessboard: PropTypes.func, // Questa prop deve essere a questo livello, non dentro selectedNode
+    onOpenChessboard: PropTypes.func,
+    onStartDrillMode: PropTypes.func,
+    setCanvasData: PropTypes.func.isRequired, // Aggiungi questa prop
 };
 
 export default Sidebar;
