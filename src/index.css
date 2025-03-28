@@ -15,8 +15,16 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
-
+.sidebar, .canvas-container {
+  max-height: 100vh;
+  overflow: auto; /* Permette lo scroll all'interno dei componenti se necessario */
+}
 a {
   font-weight: 500;
   color: #646cff;

@@ -199,8 +199,16 @@ function App() {
     };
 
     // Funzione per aggiornare il canvas dalla scacchiera
-    const handleUpdateCanvasFromChessboard = (updatedCanvasData) => {
-        setCanvasData(updatedCanvasData);
+    const handleUpdateCanvasFromChessboard = (updatedCanvas) => {
+        setCanvasData(updatedCanvas);
+
+        // Se un nodo è selezionato, aggiorna anche lo stato selectedNode
+        if (selectedNode?.id) {
+            const updatedNode = updatedCanvas.nodes.find((node) => node.id === selectedNode.id);
+            if (updatedNode) {
+                setSelectedNode(updatedNode);
+            }
+        }
     };
         // Aggiungi questa funzione per gestire l'aggiornamento e la selezione in un'unica operazione
     const handleUpdateCanvasAndSelectNode = useCallback((updatedCanvasData, newNodeId) => {
@@ -227,6 +235,51 @@ function App() {
     };
     const handleCloseDrillMode = () => {
         setIsDrillModeOpen(false);
+    };
+    const handleDeleteNode = (nodeId, isRecursive) => {
+        if (!nodeId || !canvasData) return;
+
+        // Clone dei dati del canvas attuali
+        const newCanvasData = { ...canvasData };
+
+        if (isRecursive) {
+            // Eliminazione ricorsiva: elimina il nodo e tutti i figli
+            const nodesToDelete = new Set();
+
+            // Funzione per trovare tutti i nodi figli ricorsivamente
+            const findDescendants = (id) => {
+                nodesToDelete.add(id);
+                const childConnections = canvasData.connections.filter(
+                    (conn) => conn.fromId === id
+                );
+                childConnections.forEach((conn) => {
+                    findDescendants(conn.toId);
+                });
+            };
+
+            findDescendants(nodeId);
+
+            // Filtra i nodi, rimuovendo quelli da eliminare
+            newCanvasData.nodes = canvasData.nodes.filter((node) => !nodesToDelete.has(node.id));
+
+            // Filtra le connessioni, rimuovendo quelle che coinvolgono nodi eliminati
+            newCanvasData.connections = canvasData.connections.filter(
+                (conn) => !nodesToDelete.has(conn.fromId) && !nodesToDelete.has(conn.toId)
+            );
+
+            // Deseleziona il nodo se è stato eliminato
+            if (selectedNode && nodesToDelete.has(selectedNode.id)) {
+                setSelectedNode(null);
+            }
+        } else {
+            // Implementa qui l'eliminazione non ricorsiva se necessario
+        }
+
+        // Aggiorna il canvas
+        setCanvasData(newCanvasData);
+
+        // Salva in localStorage
+        localStorage.setItem('canvasData', JSON.stringify(newCanvasData));
     };
     
     // Nella sezione di rendering, passa la nuova prop al ChessboardPopup
@@ -265,7 +318,7 @@ function App() {
     }, [selectedNode, selectedAnnotation]);
 
     return (
-        <div className="h-screen w-screen flex bg-gray-900">
+        <div className="h-screen w-screen flex bg-gray-900 overflow-hidden max-h-screen max-w-screen">
             <Sidebar
                 onAddNode={handleAddNode}
                 onAddAnnotation={handleAddAnnotation}
@@ -276,6 +329,7 @@ function App() {
                 onOpenChessboard={() => setIsChessboardOpen(true)}
                 onStartDrillMode={handleStartDrillMode} // Passa la nuova funzione
                 setCanvasData={setCanvasData}
+                onDeleteNode={handleDeleteNode}
             />
             <Canvas
                 canvasData={canvasData}

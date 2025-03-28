@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Node from './Node';
 import Connection from './Connection';
@@ -29,6 +29,10 @@ const Canvas = ({
     const [canvasPosition, setCanvasPosition] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const lastMousePosition = useRef({ x: 0, y: 0 });
+    const lastTouchPosition = useRef({ x: 0, y: 0 });
+    const touchStartTime = useRef(0);
+    const [pinchStartDistance, setPinchStartDistance] = useState(null);
+    const [initialZoom, setInitialZoom] = useState(1);
 
     // All'avvio carichiamo i dati salvati da localStorage
     useEffect(() => {
@@ -44,61 +48,47 @@ const Canvas = ({
             const leafNodes = canvasData.nodes.filter(
                 (node) => !canvasData.connections.some((conn) => conn.fromId === node.id)
             );
-
             const fullLines = leafNodes
                 .map((node) => node.pgn)
                 .filter((pgn) => pgn && pgn.trim() !== '');
-
             const dataToSave = {
                 ...canvasData,
                 fullLines: fullLines,
             };
-
             localStorage.setItem('canvasData', JSON.stringify(dataToSave));
-            console.log('Dati salvati con fullLines nel localStorage');
         }, 15000);
         return () => clearInterval(interval);
-    }, [canvasData]); // Aggiungi canvasData come dipendenza
+    }, [canvasData]);
 
-    // Funzione per esportare i dati del canvas e scaricarli come file JSON
-    // Modifica alla funzione exportCanvasToFile
-    const exportCanvasToFile = () => {
-        // Identifica i nodi foglia (senza figli)
+    // Esporta i dati del canvas come file JSON
+    const exportCanvasToFile = useCallback(() => {
         const leafNodes = canvasData.nodes.filter(
             (node) => !canvasData.connections.some((conn) => conn.fromId === node.id)
         );
-
-        // Estrae i PGN validi dai nodi foglia
         const fullLines = leafNodes
             .map((node) => node.pgn)
             .filter((pgn) => pgn && pgn.trim() !== '');
-
-        // Crea l'oggetto dati con le full lines
         const exportData = {
             ...canvasData,
             fullLines: fullLines,
         };
-
         const jsonData = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonData], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-
         const a = document.createElement('a');
         a.href = url;
         a.download = 'canvasData.json';
         document.body.appendChild(a);
         a.click();
-
         setTimeout(() => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 0);
-    };
+    }, [canvasData]);
 
     // Funzione per aggiornare un nodo
-    const updateNode = (updatedNode) => {
+    const updateNode = useCallback((updatedNode) => {
         const originalNode = canvasData.nodes.find((n) => n.id === updatedNode.id);
-
         if (
             updatedNode.label !== originalNode?.label &&
             updatedNode.label &&
@@ -123,12 +113,10 @@ const Canvas = ({
                 updatedNode.id
             );
         }
-
         setCanvasData((prev) => ({
             ...prev,
             nodes: prev.nodes.map((node) => (node.id === updatedNode.id ? updatedNode : node)),
         }));
-
         if (selectedNodeId === updatedNode.id) {
             const movePath = buildMovePath(
                 canvasData.nodes,
@@ -138,10 +126,10 @@ const Canvas = ({
             if (onGeneratePGN) onGeneratePGN(movePath);
         }
         return true;
-    };
+    }, [canvasData, selectedNodeId, onGeneratePGN, setCanvasData]);
 
     // Funzione per validare l'aggiornamento di un nodo
-    const validateNodeUpdate = (updatedNode) => {
+    const validateNodeUpdate = useCallback((updatedNode) => {
         if (!updatedNode.label || updatedNode.label.trim() === '') return true;
         return isValidChessMove(
             updatedNode.label,
@@ -149,10 +137,10 @@ const Canvas = ({
             canvasData.connections,
             updatedNode.id
         );
-    };
+    }, [canvasData]);
 
     // Funzione per aggiungere un nodo figlio
-    const handleAddChildNode = (parentId) => {
+    const handleAddChildNode = useCallback((parentId) => {
         const parentNode = canvasData.nodes.find((node) => node.id === parentId);
         if (!parentNode) return;
         const childNode = {
@@ -174,16 +162,17 @@ const Canvas = ({
             connections: [...(prev.connections || []), newConnection],
         }));
         if (onNodeSelect) onNodeSelect(childNode.id);
-    };
-    const handleReorganizeNodes = () => {
+    }, [canvasData, onNodeSelect, setCanvasData]);
+
+    // Riorganizza i nodi automaticamente
+    const handleReorganizeNodes = useCallback(() => {
         const updatedCanvasData = reorganizeCanvasNodes(canvasData);
         setCanvasData(updatedCanvasData);
-    };
+    }, [canvasData, setCanvasData]);
 
     // Funzione per eliminare un nodo (con o senza figli)
-    const handleDeleteNode = (nodeId, isRecursive) => {
+    const handleDeleteNode = useCallback((nodeId, isRecursive) => {
         if (!nodeId || !canvasData) return;
-
         if (isRecursive) {
             const nodesToDelete = new Set();
             const findDescendants = (id) => {
@@ -222,24 +211,23 @@ const Canvas = ({
                 onNodeSelect(null);
             }
         }
-    };
+    }, [canvasData, selectedNodeId, onNodeSelect, setCanvasData]);
 
-    // Handler per la selezione del nodo
-    const handleNodeSelect = (nodeId) => {
+    // Handler per la selezione di nodi e annotazioni
+    const handleNodeSelect = useCallback((nodeId) => {
         if (onNodeSelect) {
             onNodeSelect(nodeId);
         }
-    };
+    }, [onNodeSelect]);
 
-    // Handler per la selezione dell'annotazione
-    const handleAnnotationSelect = (annotationId) => {
+    const handleAnnotationSelect = useCallback((annotationId) => {
         if (onAnnotationSelect) {
             onAnnotationSelect(annotationId);
         }
-    };
+    }, [onAnnotationSelect]);
 
     // Click sul canvas deseleziona tutto
-    const handleCanvasClick = (e) => {
+    const handleCanvasClick = useCallback((e) => {
         if (e.target === canvasRef.current) {
             if (selectedNodeId && onNodeSelect) {
                 onNodeSelect(null);
@@ -248,33 +236,64 @@ const Canvas = ({
                 onAnnotationSelect(null);
             }
         }
-    };
+    }, [selectedNodeId, selectedAnnotationId, onNodeSelect, onAnnotationSelect]);
 
-    // Gestione dello stato di trascinamento del nodo
-    const handleNodeDragStart = () => {
+    // Gestione dello stato di trascinamento
+    const handleNodeDragStart = useCallback(() => {
         setIsDraggingNode(true);
-    };
-    const handleNodeDragEnd = () => {
+    }, []);
+
+    const handleNodeDragEnd = useCallback(() => {
         setIsDraggingNode(false);
-    };
+    }, []);
 
-    // Gestione dello stato di trascinamento dell'annotazione
-    const handleAnnotationDragStart = () => {
+    const handleAnnotationDragStart = useCallback(() => {
         setIsDraggingAnnotation(true);
-    };
-    const handleAnnotationDragEnd = () => {
-        setIsDraggingAnnotation(false);
-    };
+    }, []);
 
-    // Gestione dello spostamento del canvas
-    const handleCanvasMouseDown = (e) => {
+    const handleAnnotationDragEnd = useCallback(() => {
+        setIsDraggingAnnotation(false);
+    }, []);
+
+    // Eliminazione di un'annotazione
+    const handleDeleteAnnotation = useCallback((annotationId) => {
+        if (!annotationId || !canvasData) return;
+        if (window.confirm('Sei sicuro di voler eliminare questa annotazione?')) {
+            setCanvasData({
+                ...canvasData,
+                annotations: canvasData.annotations.filter((ann) => ann.id !== annotationId),
+            });
+            if (selectedAnnotationId === annotationId && onAnnotationSelect) {
+                onAnnotationSelect(null);
+            }
+        }
+    }, [canvasData, selectedAnnotationId, onAnnotationSelect, setCanvasData]);
+
+    // Evento pressione tasto per eliminare annotazione
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === '\\') {
+                if (selectedAnnotationId) {
+                    e.preventDefault();
+                    handleDeleteAnnotation(selectedAnnotationId);
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [selectedAnnotationId, handleDeleteAnnotation]);
+
+    // Gestione spostamento canvas con mouse
+    const handleCanvasMouseDown = useCallback((e) => {
         if (isDraggingNode || isDraggingAnnotation || e.target !== canvasRef.current) return;
         setIsDraggingCanvas(true);
         lastMousePosition.current = { x: e.clientX, y: e.clientY };
         e.preventDefault();
-    };
+    }, [isDraggingNode, isDraggingAnnotation]);
 
-    const handleCanvasMouseMove = (e) => {
+    const handleCanvasMouseMove = useCallback((e) => {
         if (!isDraggingCanvas) return;
         const dx = e.clientX - lastMousePosition.current.x;
         const dy = e.clientY - lastMousePosition.current.y;
@@ -283,56 +302,90 @@ const Canvas = ({
             y: prev.y + dy,
         }));
         lastMousePosition.current = { x: e.clientX, y: e.clientY };
-    };
+    }, [isDraggingCanvas]);
 
-    const handleCanvasMouseUp = () => {
+    const handleCanvasMouseUp = useCallback(() => {
         setIsDraggingCanvas(false);
-    };
-    const handleDeleteAnnotation = (annotationId) => {
-        if (!annotationId || !canvasData) return;
+    }, []);
 
-        // Chiedi conferma all'utente
-        if (window.confirm('Sei sicuro di voler eliminare questa annotazione?')) {
-            // Rimuovi l'annotazione dal canvasData
-            setCanvasData({
-                ...canvasData,
-                annotations: canvasData.annotations.filter((ann) => ann.id !== annotationId),
-            });
-
-            // Deseleziona l'annotazione corrente
-            if (selectedAnnotationId === annotationId && onAnnotationSelect) {
-                onAnnotationSelect(null);
-            }
-        }
-    };
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            // Intercetta il tasto "\" (backslash)
-            if (e.key === '\\') {
-                // Se c'è un'annotazione selezionata, eliminala
-                if (selectedAnnotationId) {
-                    e.preventDefault();
-                    handleDeleteAnnotation(selectedAnnotationId);
-                }
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [selectedAnnotationId, canvasData]);
-
-    // Gestione dello scroll con la rotella del mouse
-    const handleWheel = (e) => {
+    // Gestione evento wheel (scroll)
+    const handleWheel = useCallback((e) => {
         if (isDraggingNode || isDraggingAnnotation) return;
         e.preventDefault();
         setCanvasPosition((prev) => ({
             x: prev.x - e.deltaX,
             y: prev.y - e.deltaY,
         }));
-    };
+    }, [isDraggingNode, isDraggingAnnotation]);
 
+    // TOUCH SUPPORT - Gestione eventi touch per dispositivi mobili
+    const handleTouchStart = useCallback((e) => {
+        if (e.target !== canvasRef.current) return;
+        touchStartTime.current = Date.now();
+        
+        if (e.touches.length === 1) {
+            // Single touch - panning
+            setIsDraggingCanvas(true);
+            const touch = e.touches[0];
+            lastTouchPosition.current = { x: touch.clientX, y: touch.clientY };
+        } else if (e.touches.length === 2) {
+            // Pinch to zoom
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const distance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+            );
+            setPinchStartDistance(distance);
+            setInitialZoom(zoom);
+        }
+        e.preventDefault();
+    }, [zoom]);
+
+    const handleTouchMove = useCallback((e) => {
+        e.preventDefault();
+        if (e.touches.length === 1 && isDraggingCanvas) {
+            // Handle panning
+            const touch = e.touches[0];
+            const dx = touch.clientX - lastTouchPosition.current.x;
+            const dy = touch.clientY - lastTouchPosition.current.y;
+            setCanvasPosition((prev) => ({
+                x: prev.x + dx,
+                y: prev.y + dy,
+            }));
+            lastTouchPosition.current = { x: touch.clientX, y: touch.clientY };
+        } else if (e.touches.length === 2 && pinchStartDistance !== null) {
+            // Handle pinch zooming
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const distance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+            );
+            const scale = distance / pinchStartDistance;
+            const newZoom = Math.max(0.3, Math.min(2, initialZoom * scale));
+            setZoom(newZoom);
+        }
+    }, [isDraggingCanvas, pinchStartDistance, initialZoom]);
+
+    const handleTouchEnd = useCallback((e) => {
+        // Check if it was a tap (quick touch)
+        const touchDuration = Date.now() - touchStartTime.current;
+        if (touchDuration < 200 && e.touches.length === 0 && e.target === canvasRef.current) {
+            // This was a tap, deselect items
+            if (selectedNodeId && onNodeSelect) {
+                onNodeSelect(null);
+            }
+            if (selectedAnnotationId && onAnnotationSelect) {
+                onAnnotationSelect(null);
+            }
+        }
+        
+        setIsDraggingCanvas(false);
+        setPinchStartDistance(null);
+    }, [selectedNodeId, selectedAnnotationId, onNodeSelect, onAnnotationSelect]);
+
+    // Imposta gli event listener
     useEffect(() => {
         if (isDraggingCanvas) {
             window.addEventListener('mousemove', handleCanvasMouseMove);
@@ -345,31 +398,36 @@ const Canvas = ({
             window.removeEventListener('mousemove', handleCanvasMouseMove);
             window.removeEventListener('mouseup', handleCanvasMouseUp);
         };
-    }, [isDraggingCanvas]);
+    }, [isDraggingCanvas, handleCanvasMouseMove, handleCanvasMouseUp]);
 
     useEffect(() => {
         const container = containerRef.current;
         if (container) {
             container.addEventListener('wheel', handleWheel, { passive: false });
+            
+            // Aggiungi gestori di eventi touch
+            container.addEventListener('touchstart', handleTouchStart, { passive: false });
+            container.addEventListener('touchmove', handleTouchMove, { passive: false });
+            container.addEventListener('touchend', handleTouchEnd);
+            container.addEventListener('touchcancel', handleTouchEnd);
         }
         return () => {
             if (container) {
                 container.removeEventListener('wheel', handleWheel);
+                container.removeEventListener('touchstart', handleTouchStart);
+                container.removeEventListener('touchmove', handleTouchMove);
+                container.removeEventListener('touchend', handleTouchEnd);
+                container.removeEventListener('touchcancel', handleTouchEnd);
             }
         };
-    }, []);
+    }, [handleWheel, handleTouchStart, handleTouchMove, handleTouchEnd]);
+
+    // Limita il zoom a valori ragionevoli
+    const limitedZoom = Math.max(0.3, Math.min(2, zoom));
 
     return (
         <div ref={containerRef} className="w-full h-full flex-1 relative overflow-hidden">
-            {/* Pulsante per esportare il canvas */}
-            <div className="absolute top-2 right-2 z-50">
-                <button
-                    onClick={exportCanvasToFile}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
-                >
-                    Esporta JSON
-                </button>
-            </div>
+            {/* Pattern griglia sfondo */}
             <div
                 className="absolute inset-0 w-full h-full z-0"
                 style={{
@@ -378,41 +436,17 @@ const Canvas = ({
                     backgroundPosition: `${canvasPosition.x % 20}px ${canvasPosition.y % 20}px`,
                 }}
             />
-            <div className="absolute bottom-4 right-4 group z-50">
-                <button className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full shadow-lg focus:outline-none">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-6 w-6">
-                        <text
-                            x="50%"
-                            y="50%"
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            fontSize="20"
-                            fill="currentColor"
-                        >
-                            ⌘
-                        </text>
-                    </svg>
-                </button>
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none absolute bottom-full right-0 mb-2 bg-black/70 text-white text-sm px-6 py-1 rounded min-w-[250px] whitespace-pre-line">
-                    Shortcuts:
-                    <br />
-                    9: aggiungi Nodo
-                    <br />
-                    x: elimina Nodo
-                    <br />
-                    \: elimina Nodo con figli
-                </div>
-            </div>
-            {/* Nuovi pulsanti per zoom */}
-            <div className="absolute bottom-4 right-20 z-50 flex space-x-1">
+
+            {/* Pulsante esporta in alto a destra */}
+            <div className="fixed top-4 right-4 z-50">
                 <button
-                    onClick={handleReorganizeNodes}
-                    className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
-                    title="Riorganizza Nodi"
+                    onClick={exportCanvasToFile}
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-md shadow-lg focus:outline-none flex items-center justify-center"
+                    title="Esporta JSON"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
+                        className="h-5 w-5 sm:mr-1"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -421,23 +455,14 @@ const Canvas = ({
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                         />
                     </svg>
-                </button>
-                <button
-                    onClick={() => setZoom((prev) => Math.min(prev + 0.1, 2))}
-                    className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
-                >
-                    +
-                </button>
-                <button
-                    onClick={() => setZoom((prev) => Math.max(prev - 0.1, 0.3))}
-                    className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
-                >
-                    −
+                    <span className="hidden sm:inline">Esporta JSON</span>
                 </button>
             </div>
+
+            {/* Canvas principale */}
             <div
                 ref={canvasRef}
                 className="absolute"
@@ -446,12 +471,14 @@ const Canvas = ({
                     height: '20000px',
                     left: '-10000px',
                     top: '-10000px',
-                    transform: `translate(${canvasPosition.x}px, ${canvasPosition.y}px) scale(${zoom})`,
+                    transform: `translate(${canvasPosition.x}px, ${canvasPosition.y}px) scale(${limitedZoom})`,
                     cursor: isDraggingCanvas ? 'grabbing' : 'grab',
+                    transformOrigin: 'center center',
                 }}
                 onClick={handleCanvasClick}
                 onMouseDown={handleCanvasMouseDown}
             >
+                {/* Connessioni, nodi e annotazioni (invariati) */}
                 {canvasData?.connections?.map((connection) => {
                     const fromNode = canvasData.nodes.find((node) => node.id === connection.fromId);
                     const toNode = canvasData.nodes.find((node) => node.id === connection.toId);
@@ -469,7 +496,7 @@ const Canvas = ({
                                 x: toNode.x + 10000,
                                 y: toNode.y + 10000,
                             }}
-                            scale={1}
+                            scale={limitedZoom}
                         />
                     );
                 })}
@@ -519,6 +546,99 @@ const Canvas = ({
                         onDragEnd={handleAnnotationDragEnd}
                     />
                 ))}
+            </div>
+
+            {/* Barra dei controlli unificata in basso a destra */}
+            <div className="fixed bottom-4 right-4 z-50 flex items-center space-x-2">
+                {/* Pulsante scorciatoie - nascosto su mobile */}
+                <div className="relative group hidden md:block">
+                    <button
+                        className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
+                        title="Scorciatoie"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M8 9l3 3-3 3M13 15h3"
+                            />
+                            <rect x="4" y="4" width="16" height="16" rx="2" strokeWidth={1.5} />
+                        </svg>
+                    </button>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute bottom-full right-0 mb-2 bg-black/70 text-white text-sm p-3 rounded min-w-[200px] whitespace-pre-line z-50">
+                        <p className="font-semibold mb-1">Scorciatoie:</p>
+                        <p>9: aggiungi Nodo</p>
+                        <p>x: elimina Nodo</p>
+                        <p>\: elimina Nodo con figli</p>
+                    </div>
+                </div>
+
+                {/* Pulsante riorganizza - visibile anche su mobile */}
+                <button
+                    onClick={handleReorganizeNodes}
+                    className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
+                    title="Riorganizza Nodi"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                        />
+                    </svg>
+                </button>
+
+                {/* Pulsanti zoom - nascosti su mobile */}
+                <button
+                    onClick={() => setZoom((prev) => Math.max(prev - 0.1, 0.3))}
+                    className="hidden md:flex w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none items-center justify-center"
+                    title="Zoom out"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                    >
+                        <path
+                            fillRule="evenodd"
+                            d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z"
+                            clipRule="evenodd"
+                        />
+                    </svg>
+                </button>
+                <button
+                    onClick={() => setZoom((prev) => Math.min(prev + 0.1, 2))}
+                    className="hidden md:flex w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none items-center justify-center"
+                    title="Zoom in"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                    >
+                        <path
+                            fillRule="evenodd"
+                            d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                            clipRule="evenodd"
+                        />
+                    </svg>
+                </button>
             </div>
         </div>
     );

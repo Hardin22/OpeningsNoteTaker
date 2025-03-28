@@ -24,6 +24,7 @@ const Node = ({
     const nodeRef = useRef(null);
     const inputRef = useRef(null);
     const dragOffset = useRef({ x: 0, y: 0 });
+    const touchRef = useRef(false);
 
     // Quando il nodo viene selezionato, genera automaticamente il PGN
     useEffect(() => {
@@ -33,7 +34,7 @@ const Node = ({
         }
     }, [isSelected, node.id, canvasData, onGeneratePGN]);
 
-    // Gestione del drag and drop
+    // Gestione del drag and drop con mouse
     const handleMouseDown = (e) => {
         if (isEditing) return;
 
@@ -54,8 +55,31 @@ const Node = ({
         e.stopPropagation();
     };
 
+    // Gestione del drag and drop con touch
+    const handleTouchStart = (e) => {
+        if (isEditing) return;
+
+        touchRef.current = true;
+        setIsDragging(true);
+        onSelect(); // Seleziona il nodo quando inizia il drag
+
+        const touch = e.touches[0];
+        // Calcola l'offset del touch rispetto al nodo
+        dragOffset.current = {
+            x: touch.clientX - node.x,
+            y: touch.clientY - node.y,
+        };
+
+        // Notifica Canvas che inizia il trascinamento
+        if (onDragStart) onDragStart();
+
+        // Previeni il comportamento di default e la propagazione
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
     const handleMouseMove = (e) => {
-        if (!isDragging) return;
+        if (!isDragging || touchRef.current) return;
         const newX = e.clientX - dragOffset.current.x;
         const newY = e.clientY - dragOffset.current.y;
         updateNode({
@@ -65,9 +89,34 @@ const Node = ({
         });
     };
 
+    const handleTouchMove = (e) => {
+        if (!isDragging || !touchRef.current) return;
+
+        const touch = e.touches[0];
+        const newX = touch.clientX - dragOffset.current.x;
+        const newY = touch.clientY - dragOffset.current.y;
+
+        updateNode({
+            ...node,
+            x: newX,
+            y: newY,
+        });
+
+        e.preventDefault();
+    };
+
     const handleMouseUp = () => {
-        if (isDragging) {
+        if (isDragging && !touchRef.current) {
             setIsDragging(false);
+            // Notifica Canvas che il trascinamento è terminato
+            if (onDragEnd) onDragEnd();
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (isDragging && touchRef.current) {
+            setIsDragging(false);
+            touchRef.current = false;
             // Notifica Canvas che il trascinamento è terminato
             if (onDragEnd) onDragEnd();
         }
@@ -162,7 +211,9 @@ const Node = ({
 
     // Funzione per eliminare un singolo nodo con conferma browser
     const handleDeleteNode = () => {
-        const confirmed = window.confirm(`Sei sicuro di voler eliminare il nodo "${node.label || 'senza nome'}"?`);
+        const confirmed = window.confirm(
+            `Sei sicuro di voler eliminare il nodo "${node.label || 'senza nome'}"?`
+        );
         if (confirmed && onDeleteNode) {
             onDeleteNode(node.id, false); // false = non ricorsivo
         }
@@ -171,7 +222,9 @@ const Node = ({
     // Funzione per eliminazione ricorsiva con conferma browser
     const handleRecursiveDelete = () => {
         const confirmed = window.confirm(
-            `ATTENZIONE! Stai per eliminare il nodo "${node.label || 'senza nome'}" e TUTTI I SUOI NODI FIGLI.\n\nQuesta azione non può essere annullata. Vuoi procedere?`
+            `ATTENZIONE! Stai per eliminare il nodo "${
+                node.label || 'senza nome'
+            }" e TUTTI I SUOI NODI FIGLI.\n\nQuesta azione non può essere annullata. Vuoi procedere?`
         );
         if (confirmed && onDeleteNode) {
             onDeleteNode(node.id, true); // true = eliminazione ricorsiva
@@ -183,14 +236,23 @@ const Node = ({
         if (isDragging) {
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener('touchmove', handleTouchMove, { passive: false });
+            window.addEventListener('touchend', handleTouchEnd);
+            window.addEventListener('touchcancel', handleTouchEnd);
         } else {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleTouchEnd);
+            window.removeEventListener('touchcancel', handleTouchEnd);
         }
 
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleTouchEnd);
+            window.removeEventListener('touchcancel', handleTouchEnd);
         };
     }, [isDragging]);
 
@@ -242,6 +304,10 @@ const Node = ({
                 ? '0 8px 16px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.5)'
                 : '0 4px 6px rgba(0, 0, 0, 0.1)',
         transition: 'all 0.2s ease',
+        userSelect: 'none', // Previene la selezione del testo
+        WebkitUserSelect: 'none', // Per Safari
+        MozUserSelect: 'none', // Per Firefox
+        msUserSelect: 'none', // Per IE/Edge
     };
 
     // Determinazione della classe CSS in base allo stato
@@ -270,6 +336,7 @@ const Node = ({
                 style={nodeStyle}
                 className={nodeClass}
                 onMouseDown={handleMouseDown}
+                onTouchStart={handleTouchStart}
                 onDoubleClick={handleDoubleClick}
                 onClick={handleClick}
                 onMouseEnter={handleMouseEnter}

@@ -4,13 +4,6 @@ import { Chess } from 'chess.js';
 import PropTypes from 'prop-types';
 import { createNodeWithOptimalPosition } from '../utils/layoutUtils';
 
-/**
- * Componente ChessboardPopup
- * Funzionalità:
- * 1. Visualizza una posizione di scacchi
- * 2. Permette la navigazione avanti/indietro
- * 3. Seleziona il nodo corrispondente quando si naviga
- */
 const ChessboardPopup = ({
     pgn,
     onClose,
@@ -19,85 +12,75 @@ const ChessboardPopup = ({
     selectedNodeId,
     onUpdateCanvas,
     onSelectNode,
-    onUpdateCanvasAndSelectNode, // Nuova prop
+    onUpdateCanvasAndSelectNode,
 }) => {
-    // Stati essenziali
+    // Stati
     const [position, setPosition] = useState('');
     const [moveHistory, setMoveHistory] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(-1);
     const [currentNote, setCurrentNote] = useState('');
-    const [isEditingNote, setIsEditingNote] = useState(false);
-
-    // NUOVO: Memorizza il nodo iniziale
     const [initialNodeId, setInitialNodeId] = useState(null);
-
-    // NUOVO: Flag di sicurezza per prevenire chiusure
     const [internalCanvasData, setInternalCanvasData] = useState(canvasData);
-
-    // Mappa per associare nodi a genitori
-    const parentNodeMap = useRef({});
-    // Mappa per associare nodi ai loro PGN
-    const nodePgnMap = useRef({});
-    // Riferimento all'istanza di Chess (invece di useState)
-    const gameRef = useRef(new Chess());
-    // Flag per prevenire la chiusura durante gli aggiornamenti
-    const isUpdatingRef = useRef(false);
-    // Stato del popup (mounted/unmounted)
-    const isMountedRef = useRef(true);
     const [childrenOptions, setChildrenOptions] = useState([]);
     const [showChildSelector, setShowChildSelector] = useState(false);
+    const [showMobilePanel, setShowMobilePanel] = useState(false);
 
-    // NUOVO: Funzioni wrapper sicure per gli aggiornamenti
-    const safeUpdateCanvas = useCallback(
-        (updatedCanvas) => {
-            if (!isMountedRef.current || !onUpdateCanvas) return;
+    // Riferimenti
+    const parentNodeMap = useRef({});
+    const nodePgnMap = useRef({});
+    const gameRef = useRef(new Chess());
+    const isUpdatingRef = useRef(false);
+    const isMountedRef = useRef(true);
+    const boardContainerRef = useRef(null);
+    const lastSavedNoteRef = useRef('');
 
-            // Aggiorna lo stato interno prima di notificare il parent
-            setInternalCanvasData(updatedCanvas);
+    // Dimensionamento della scacchiera
+    const [boardSize, setBoardSize] = useState(400);
 
-            // Usiamo requestAnimationFrame per assicurarci che l'aggiornamento dell'UI
-            // avvenga prima di notificare il parent (evitando chiusure impreviste)
-            requestAnimationFrame(() => {
-                if (isMountedRef.current) {
-                    onUpdateCanvas(updatedCanvas);
+    // Gestisce il dimensionamento della scacchiera
+    useEffect(() => {
+        const updateBoardSize = () => {
+            if (boardContainerRef.current) {
+                // Per mobile (< 768px) usa quasi tutta la larghezza
+                if (window.innerWidth < 768) {
+                    const viewportWidth = window.innerWidth;
+                    setBoardSize(Math.min(viewportWidth * 0.85, 500));
                 }
-            });
-        },
-        [onUpdateCanvas]
-    );
-
-    const safeSelectNode = useCallback(
-        (nodeId) => {
-            if (!isMountedRef.current || !onSelectNode) return;
-
-            // Uso di requestAnimationFrame per lo stesso motivo
-            requestAnimationFrame(() => {
-                if (isMountedRef.current) {
-                    onSelectNode(nodeId);
+                // Per desktop, dimensiona in base al contenitore, ma non superare il limite
+                else {
+                    const containerWidth = boardContainerRef.current.clientWidth;
+                    setBoardSize(Math.min(containerWidth * 0.9, 580));
                 }
-            });
-        },
-        [onSelectNode]
-    );
+            }
+        };
+
+        // Aggiorna la dimensione iniziale
+        updateBoardSize();
+
+        // Aggiorna la dimensione quando la finestra cambia
+        window.addEventListener('resize', updateBoardSize);
+
+        return () => {
+            window.removeEventListener('resize', updateBoardSize);
+        };
+    }, []);
 
     // Quando il componente viene montato/smontato
     useEffect(() => {
         isMountedRef.current = true;
-
-        // Cleanup function
         return () => {
             isMountedRef.current = false;
         };
     }, []);
 
-    // Aggiorniamo lo stato interno quando cambiano i props esterni
+    // Aggiorna lo stato interno quando cambiano i props esterni
     useEffect(() => {
         if (canvasData && JSON.stringify(canvasData) !== JSON.stringify(internalCanvasData)) {
             setInternalCanvasData(canvasData);
         }
     }, [canvasData]);
 
-    // Carica il PGN e costruisci le mappe di relazione
+    // Carica il PGN e costruisci le mappe
     useEffect(() => {
         if (!isMountedRef.current) return;
 
@@ -116,7 +99,11 @@ const ChessboardPopup = ({
         setPosition(currentGame.fen());
         setMoveHistory(history);
         setCurrentIndex(history.length - 1);
-        setCurrentNote(nodeDescription || '');
+        
+        // Imposta la nota e salva il suo valore nel ref
+        const noteValue = nodeDescription || '';
+        setCurrentNote(noteValue);
+        lastSavedNoteRef.current = noteValue;
 
         if (selectedNodeId && !initialNodeId) {
             setInitialNodeId(selectedNodeId);
@@ -145,7 +132,28 @@ const ChessboardPopup = ({
         return () => {
             currentGame.reset();
         };
-    }, [pgn, nodeDescription, internalCanvasData, initialNodeId]);
+    }, [pgn, nodeDescription, internalCanvasData, initialNodeId, selectedNodeId]);
+
+    const safeUpdateCanvas = useCallback(
+        (updatedCanvas) => {
+            if (!isMountedRef.current || !onUpdateCanvas) return;
+            
+            // Imposta subito lo stato locale
+            setInternalCanvasData(updatedCanvas);
+            
+            // Aggiorna il canvas esterno con una leggera animazione
+            onUpdateCanvas(updatedCanvas);
+        },
+        [onUpdateCanvas]
+    );
+
+    const safeSelectNode = useCallback(
+        (nodeId) => {
+            if (!isMountedRef.current || !onSelectNode) return;
+            onSelectNode(nodeId);
+        },
+        [onSelectNode]
+    );
 
     // Funzione ausiliaria per trovare un nodo per ID
     const findNodeById = (nodes, nodeId) => {
@@ -156,35 +164,31 @@ const ChessboardPopup = ({
     const navigateToNode = (nodeId) => {
         if (!nodeId || !internalCanvasData) return;
 
-        // Trova il nodo
         const targetNode = findNodeById(internalCanvasData.nodes, nodeId);
         if (!targetNode) return;
 
-        // Se abbiamo il PGN per questo nodo, caricalo
         const nodePgn = targetNode.pgn || nodePgnMap.current[nodeId] || pgn;
 
         try {
-            // Carica il PGN del nodo
             gameRef.current.reset();
             if (nodePgn && nodePgn.trim()) {
                 gameRef.current.loadPgn(nodePgn);
             }
 
-            // Aggiorna la posizione
             const history = gameRef.current.history({ verbose: true });
             setPosition(gameRef.current.fen());
             setMoveHistory(history);
             setCurrentIndex(history.length - 1);
 
-            // Seleziona il nodo
             if (nodeId !== selectedNodeId) {
                 safeSelectNode(nodeId);
             }
 
-            // Aggiorna la nota
             const node = findNodeById(internalCanvasData.nodes, nodeId);
             if (node) {
-                setCurrentNote(node.description || '');
+                const noteValue = node.description || '';
+                setCurrentNote(noteValue);
+                lastSavedNoteRef.current = noteValue;
             }
         } catch (error) {
             console.error('Errore nella navigazione al nodo:', error);
@@ -194,10 +198,8 @@ const ChessboardPopup = ({
     // Funzione per navigare a una mossa specifica
     const navigateToMove = (index) => {
         try {
-            // Reset del gioco
             gameRef.current.reset();
 
-            // Se non è la posizione iniziale, esegui le mosse fino all'indice specificato
             if (index >= 0) {
                 for (let i = 0; i <= index; i++) {
                     if (i < moveHistory.length) {
@@ -206,7 +208,6 @@ const ChessboardPopup = ({
                 }
             }
 
-            // Aggiorna la posizione e l'indice corrente
             setPosition(gameRef.current.fen());
             setCurrentIndex(index);
         } catch (error) {
@@ -214,47 +215,35 @@ const ChessboardPopup = ({
         }
     };
 
-    // FUNZIONI DI NAVIGAZIONE SEMPLIFICATE
-
-    // Vai alla posizione iniziale
+    // FUNZIONI DI NAVIGAZIONE
     const goToStart = () => {
-        // Semplicemente torna alla posizione iniziale (prima di qualsiasi mossa)
         navigateToMove(-1);
     };
 
-    // Vai al nodo genitore diretto
     const goToPrevious = () => {
-        // Se abbiamo un nodo selezionato, trova il suo genitore diretto e naviga ad esso
         if (selectedNodeId && parentNodeMap.current[selectedNodeId]) {
             const parentId = parentNodeMap.current[selectedNodeId];
             navigateToNode(parentId);
         } else {
-            // Fallback: se non troviamo un genitore, usa la navigazione standard
             currentIndex > -1 && navigateToMove(currentIndex - 1);
         }
     };
 
-    // Vai alla prossima mossa (se siamo in una sequenza lineare)
     const goToNext = () => {
-        // Se abbiamo mosse rimanenti nella sequenza lineare, prosegui normalmente
         if (currentIndex < moveHistory.length - 1) {
             navigateToMove(currentIndex + 1);
             return;
         }
 
-        // Altrimenti, cerca figli diretti del nodo selezionato nel grafo
         if (selectedNodeId && internalCanvasData) {
-            // Trova tutti i figli del nodo corrente
             const childConnections = internalCanvasData.connections.filter(
                 (conn) => conn.fromId === selectedNodeId
             );
 
             if (childConnections.length === 0) {
-                // Nessun figlio disponibile
                 return;
             }
 
-            // Prepara opzioni di figli
             const childOptions = childConnections.map((conn) => {
                 const childNode = internalCanvasData.nodes.find((node) => node.id === conn.toId);
                 return {
@@ -264,107 +253,68 @@ const ChessboardPopup = ({
             });
 
             if (childOptions.length === 1) {
-                // Se c'è un solo figlio, naviga direttamente
                 navigateToNode(childOptions[0].id);
             } else if (childOptions.length > 1) {
-                // Se ci sono più figli, mostra il dialog di selezione
                 setChildrenOptions(childOptions);
                 setShowChildSelector(true);
             }
         }
     };
 
-    // Funzione per gestire la selezione di un nodo figlio
     const handleChildSelect = (nodeId) => {
         setShowChildSelector(false);
         navigateToNode(nodeId);
     };
 
-    // Vai all'ultima posizione
     const goToEnd = () => {
         navigateToMove(moveHistory.length - 1);
     };
 
-    // NUOVO: Torna al nodo iniziale
     const goToInitialNode = () => {
         if (initialNodeId) {
             navigateToNode(initialNodeId);
         }
     };
 
-    // NUOVA IMPLEMENTAZIONE ROBUSTA per il drop delle mosse
-    // NUOVA IMPLEMENTAZIONE ROBUSTA per il drop delle mosse
     const handlePieceDrop = (sourceSquare, targetSquare) => {
-        console.log('===== NUOVO DROP =====');
         try {
-            // Esegui la mossa
             const moveObj = { from: sourceSquare, to: targetSquare, promotion: 'q' };
             const result = gameRef.current.move(moveObj);
 
             if (!result) {
-                console.log('Mossa non valida');
                 return false;
             }
 
-            console.log('Mossa eseguita:', result.san);
-
-            // Aggiorna la scacchiera
             setPosition(gameRef.current.fen());
 
-            // Se non abbiamo dati canvas o un nodo selezionato, usciamo qui
             if (!internalCanvasData || !selectedNodeId) {
-                console.log('Nessun canvas o nodo selezionato');
                 return true;
             }
 
-            console.log('Nodo selezionato:', selectedNodeId);
-            console.log('Posizione corrente FEN:', gameRef.current.fen());
-
-            // 1. Trova tutti i figli diretti del nodo selezionato
             const childConnections = internalCanvasData.connections.filter(
                 (conn) => conn.fromId === selectedNodeId
             );
-            console.log('Connessioni figlie trovate:', childConnections.length);
 
             const childNodeIds = childConnections.map((conn) => conn.toId);
-            console.log('ID dei nodi figli:', childNodeIds);
 
-            // 2. Cerca tra i figli uno con la stessa etichetta della mossa
             let matchingNodeId = null;
 
-            // Debug: Stampa tutti i figli e le loro etichette
-            console.log('Dettagli dei nodi figli:');
             for (const childId of childNodeIds) {
                 const childNode = internalCanvasData.nodes.find((node) => node.id === childId);
-                console.log(`Nodo ${childId}:`, childNode ? childNode.label : 'non trovato');
-
                 if (childNode && childNode.label === result.san) {
                     matchingNodeId = childId;
-                    console.log(
-                        `TROVATA CORRISPONDENZA: Nodo ${childId} ha etichetta "${childNode.label}"`
-                    );
                 }
             }
 
-            // Aggiorna la storia delle mosse
             const newHistory = [...moveHistory.slice(0, currentIndex + 1), result];
             setMoveHistory(newHistory);
             setCurrentIndex(currentIndex + 1);
 
-            // 3. Se esiste, naviga ad esso
             if (matchingNodeId) {
-                console.log(
-                    `[PERCORSO ESISTENTE] Usando nodo ${matchingNodeId} per la mossa ${result.san}`
-                );
-                console.log('Chiamando safeSelectNode con ID:', matchingNodeId);
-
-                // Importante: esplicitamente non creare un nuovo nodo
                 safeSelectNode(matchingNodeId);
                 return true;
             }
 
-            // 4. Altrimenti crea un nuovo nodo
-            console.log(`[NUOVO NODO] Creando un nuovo nodo per la mossa ${result.san}`);
             const updatedCanvas = createNodeWithOptimalPosition(
                 internalCanvasData,
                 selectedNodeId,
@@ -377,14 +327,10 @@ const ChessboardPopup = ({
             );
 
             const newNodeId = updatedCanvas.nodes[updatedCanvas.nodes.length - 1]?.id;
-            console.log('Nuovo nodo creato con ID:', newNodeId);
 
             if (onUpdateCanvasAndSelectNode) {
-                console.log('Usando onUpdateCanvasAndSelectNode');
                 onUpdateCanvasAndSelectNode(updatedCanvas, newNodeId);
             } else {
-                console.log('Usando setInternalCanvasData + safeUpdateCanvas + safeSelectNode');
-                setInternalCanvasData(updatedCanvas);
                 safeUpdateCanvas(updatedCanvas);
                 safeSelectNode(newNodeId);
             }
@@ -396,90 +342,126 @@ const ChessboardPopup = ({
         }
     };
 
-    // Salva la nota associata al nodo
+    // Gestisce il salvataggio delle note con sincronizzazione migliorata
     const saveNote = () => {
         if (!selectedNodeId || !internalCanvasData) return;
+        
+        // Se la nota è invariata, non fare nulla
+        if (currentNote === lastSavedNoteRef.current) return;
 
         try {
-            // Aggiorna il nodo con la nuova descrizione
-            const updatedNodes = internalCanvasData.nodes.map((node) => {
-                if (node.id === selectedNodeId) {
-                    return { ...node, description: currentNote };
-                }
-                return node;
-            });
-
-            // Crea un nuovo oggetto canvas con i nodi aggiornati
-            const updatedCanvas = {
-                ...internalCanvasData,
-                nodes: updatedNodes,
-            };
-
-            // Aggiorna prima lo stato interno
-            setInternalCanvasData(updatedCanvas);
-
-            // Poi notifica il parent in modo sicuro
+            // Aggiorna il riferimento della nota salvata
+            lastSavedNoteRef.current = currentNote;
+            
+            // Crea una copia profonda dell'oggetto canvas
+            const updatedCanvas = JSON.parse(JSON.stringify(internalCanvasData));
+            
+            // Aggiorna la descrizione del nodo selezionato
+            const nodeIndex = updatedCanvas.nodes.findIndex(node => node.id === selectedNodeId);
+            if (nodeIndex !== -1) {
+                updatedCanvas.nodes[nodeIndex].description = currentNote;
+            }
+            
+            // Aggiorna immediatamente il canvas
             safeUpdateCanvas(updatedCanvas);
-
-            // Esci dalla modalità di modifica
-            setIsEditingNote(false);
         } catch (error) {
             console.error('Errore nel salvataggio della nota:', error);
         }
     };
 
-    // Formatta la notazione della mossa
+    // Gestisce il cambio del testo nella textarea
+    const handleNoteChange = (e) => {
+        setCurrentNote(e.target.value);
+    };
+
+    // Gestisce gli eventi dei tasti nella textarea
+    const handleNoteKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault(); // Impedisce l'inserimento dell'a capo
+            saveNote();
+            e.target.blur(); // Deseleziona il campo di testo
+        }
+    };
+
     const formatMoveNotation = (move, index) => {
         const moveNumber = Math.floor(index / 2) + 1;
         return index % 2 === 0 ? `${moveNumber}. ${move.san}` : move.san;
     };
 
-    // NUOVO: Gestore di chiusura sicuro
     const handleSafeClose = (e) => {
-        // Se stiamo aggiornando, impedisci la chiusura
+        e.stopPropagation();
         if (isUpdatingRef.current) {
-            console.log("Chiusura impedita durante l'aggiornamento");
-            e.preventDefault();
             return;
         }
-
-        // Altrimenti, procedi con la chiusura
+        // Assicuriamoci che le modifiche siano salvate prima di chiudere
+        saveNote();
         onClose();
     };
+
     const hasNextMoves = () => {
-        // Caso 1: Ci sono ancora mosse nella sequenza corrente
         if (currentIndex < moveHistory.length - 1) {
             return true;
         }
 
-        // Caso 2: Non siamo all'ultima mossa della sequenza
         if (!selectedNodeId || !internalCanvasData) {
             return false;
         }
 
-        // Caso 3: Controlla se il nodo selezionato ha figli nel grafo
         const hasChildren = internalCanvasData.connections.some(
             (conn) => conn.fromId === selectedNodeId
         );
 
         return hasChildren;
     };
+
+    // Toggle del pannello mobile
+    const toggleMobilePanel = () => {
+        setShowMobilePanel(!showMobilePanel);
+    };
+
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm"
-            onClick={(e) => {
-                // Impedisci la chiusura accidentale cliccando sul background
-                e.stopPropagation();
-            }}
+            onClick={onClose}
         >
             <div
-                className="bg-gray-800 rounded-lg shadow-2xl overflow-hidden max-w-5xl w-full mx-4"
+                className="bg-gray-800 rounded-lg shadow-xl w-[96%] max-w-6xl max-h-[90vh] flex flex-col overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 border-b border-gray-700">
-                    <h2 className="text-xl font-semibold text-white">Scacchiera</h2>
-                    <div className="flex items-center space-x-3">
+                <div className="flex justify-between items-center p-3 bg-gray-900 border-b border-gray-700">
+                    <h2 className="text-lg font-bold text-white">Scacchiera</h2>
+                    <div className="flex items-center gap-3">
+                        {/* Toggle mobile per mostrare/nascondere pannello info con icona dinamica */}
+                        <button
+                            onClick={toggleMobilePanel}
+                            className="md:hidden p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700"
+                            aria-label={showMobilePanel ? 'Nascondi dettagli' : 'Mostra dettagli'}
+                        >
+                            <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                {showMobilePanel ? (
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M20 12H4"
+                                    />
+                                ) : (
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 4v16m8-8H4"
+                                    />
+                                )}
+                            </svg>
+                        </button>
+
                         {/* Pulsante per tornare al nodo iniziale */}
                         {initialNodeId && initialNodeId !== selectedNodeId && (
                             <button
@@ -487,54 +469,49 @@ const ChessboardPopup = ({
                                     e.stopPropagation();
                                     goToInitialNode();
                                 }}
-                                className="text-sm bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded-md flex items-center"
+                                className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-sm"
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4 mr-1"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                                    />
-                                </svg>
-                                Posizione iniziale
+                                <span className="hidden sm:inline">Posizione iniziale</span>
+                                <span className="sm:hidden">Inizio</span>
                             </button>
                         )}
+
+                        {/* Pulsante chiusura */}
                         <button
                             onClick={handleSafeClose}
-                            className="text-gray-400 hover:text-white focus:outline-none transition-colors"
+                            className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700"
+                            aria-label="Chiudi"
                         >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
+                            <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
+                                    fillRule="evenodd"
+                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                    clipRule="evenodd"
                                 />
                             </svg>
                         </button>
                     </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row">
-                    {/* Scacchiera */}
-                    <div className="md:w-2/3 p-4">
-                        <div className="aspect-square w-full max-w-lg mx-auto">
+                {/* Contenuto principale */}
+                <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+                    {/* Container scacchiera - parte sinistra */}
+                    <div
+                        ref={boardContainerRef}
+                        className="md:w-2/3 p-4 flex flex-col items-center overflow-y-auto"
+                    >
+                        {/* Scacchiera con dimensione fissa */}
+                        <div
+                            style={{
+                                width: `${boardSize}px`,
+                                height: `${boardSize}px`,
+                                maxWidth: '100%',
+                            }}
+                        >
                             <Chessboard
+                                id="responsive-board"
                                 position={position}
-                                boardWidth={500}
+                                boardWidth={boardSize}
                                 areArrowsAllowed={false}
                                 customDarkSquareStyle={{ backgroundColor: '#4b7399' }}
                                 customLightSquareStyle={{ backgroundColor: '#eae9d2' }}
@@ -542,22 +519,17 @@ const ChessboardPopup = ({
                             />
                         </div>
 
-                        {/* Controlli - MANTENUTI SOTTO LA SCACCHIERA */}
-                        <div className="flex justify-center items-center space-x-4 mt-4">
+                        {/* Controlli navigazione */}
+                        <div className="flex justify-center space-x-4 mt-4 w-full">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     goToStart();
                                 }}
-                                className="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Vai alla posizione iniziale"
+                                className="bg-indigo-700 hover:bg-indigo-600 text-white p-2 rounded"
+                                title="Posizione iniziale"
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-5 w-5"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
+                                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path
                                         fillRule="evenodd"
                                         d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414zm-6 0a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L5.414 10l4.293 4.293a1 1 0 010 1.414z"
@@ -565,20 +537,16 @@ const ChessboardPopup = ({
                                     />
                                 </svg>
                             </button>
+
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     goToPrevious();
                                 }}
-                                className="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-indigo-700 hover:bg-indigo-600 text-white p-2 rounded"
                                 title="Mossa precedente"
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-5 w-5"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
+                                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path
                                         fillRule="evenodd"
                                         d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
@@ -586,21 +554,17 @@ const ChessboardPopup = ({
                                     />
                                 </svg>
                             </button>
+
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     goToNext();
                                 }}
-                                disabled={!hasNextMoves()} // Sostituisci la condizione precedente con questa
-                                className="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!hasNextMoves()}
+                                className="bg-indigo-700 hover:bg-indigo-600 text-white p-2 rounded disabled:opacity-50"
                                 title="Mossa successiva"
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-5 w-5"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
+                                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path
                                         fillRule="evenodd"
                                         d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
@@ -608,21 +572,17 @@ const ChessboardPopup = ({
                                     />
                                 </svg>
                             </button>
+
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     goToEnd();
                                 }}
                                 disabled={currentIndex >= moveHistory.length - 1}
-                                className="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Vai all'ultima mossa"
+                                className="bg-indigo-700 hover:bg-indigo-600 text-white p-2 rounded disabled:opacity-50"
+                                title="Ultima mossa"
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-5 w-5"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
+                                <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path
                                         fillRule="evenodd"
                                         d="M10.293 15.707a1 1 0 010-1.414L14.586 10l-4.293-4.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z"
@@ -636,27 +596,76 @@ const ChessboardPopup = ({
                                 </svg>
                             </button>
                         </div>
+
+                        {/* Note - SOLO PER MOBILE */}
+                        <div className="mt-4 w-full md:hidden">
+                            <h3 className="text-sm font-medium text-white mb-2">Note</h3>
+                            <textarea
+                                value={currentNote}
+                                onChange={handleNoteChange}
+                                onKeyDown={handleNoteKeyDown}
+                                onBlur={saveNote}
+                                className="w-full bg-gray-700 text-white text-sm p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                rows={3}
+                                placeholder="Inserisci note sulla posizione... (Premi Invio per salvare)"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
+
+                        {/* Pannello info mobile (visibile solo su schermi piccoli) */}
+                        <div
+                            className={`md:hidden mt-4 w-full ${
+                                showMobilePanel ? 'block' : 'hidden'
+                            }`}
+                        >
+                            <div className="border-t border-gray-700 pt-3">
+                                {/* Lista mosse mobile - ALTEZZA AUMENTATA */}
+                                <h3 className="text-base font-medium text-white mb-2">
+                                    Storico Mosse
+                                </h3>
+                                <div className="bg-gray-900 rounded-md p-2 max-h-64 overflow-y-auto">
+                                    {moveHistory.length > 0 ? (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {moveHistory.map((move, index) => (
+                                                <div
+                                                    key={index}
+                                                    onClick={() => navigateToMove(index)}
+                                                    className={`p-2 rounded text-sm cursor-pointer ${
+                                                        currentIndex === index
+                                                            ? 'bg-indigo-600 text-white'
+                                                            : 'text-gray-300 hover:bg-gray-800'
+                                                    }`}
+                                                >
+                                                    {formatMoveNotation(move, index)}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-gray-400 text-center py-4">
+                                            Nessuna mossa disponibile
+                                        </p>
+                                    )}
+                                </div>
+                                {/* FEN rimosso da mobile */}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Pannello laterale - [resto del codice invariato] */}
-                    <div className="md:w-1/3 p-4 border-t md:border-t-0 md:border-l border-gray-700">
-                        <h3 className="text-lg font-medium text-white mb-3 ">Storico Mosse</h3>
-                        <div className="overflow-y-auto min-h-50 max-h-60 bg-gray-900 rounded p-3">
+                    {/* Pannello laterale - visibile su desktop, nascosto su mobile */}
+                    <div className="hidden md:block md:w-1/3 border-l border-gray-700 bg-gray-800 p-4 overflow-y-auto">
+                        <h3 className="text-lg font-medium text-white mb-3">Storico Mosse</h3>
+                        <div className="bg-gray-900 rounded-md p-3 max-h-60 overflow-y-auto">
                             {moveHistory.length > 0 ? (
                                 <div className="grid grid-cols-2 gap-2">
                                     {moveHistory.map((move, index) => (
                                         <div
                                             key={index}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigateToMove(index);
-                                            }}
-                                            className={`p-2 cursor-pointer text-sm rounded transition-colors
-                                                ${
-                                                    currentIndex === index
-                                                        ? 'bg-indigo-600 text-white'
-                                                        : 'text-gray-300 hover:bg-gray-800'
-                                                }`}
+                                            onClick={() => navigateToMove(index)}
+                                            className={`p-2 rounded text-sm cursor-pointer ${
+                                                currentIndex === index
+                                                    ? 'bg-indigo-600 text-white'
+                                                    : 'text-gray-300 hover:bg-gray-800'
+                                            }`}
                                         >
                                             {formatMoveNotation(move, index)}
                                         </div>
@@ -669,12 +678,12 @@ const ChessboardPopup = ({
                             )}
                         </div>
 
-                        {/* Info sulla posizione */}
+                        {/* Info posizione */}
                         <div className="mt-4">
                             <h4 className="text-sm font-medium text-gray-300 mb-1">
                                 Posizione FEN
                             </h4>
-                            <div className="bg-gray-900 p-2 rounded text-xs text-gray-400 overflow-x-auto break-all">
+                            <div className="bg-gray-900 p-2 rounded-md text-xs text-gray-400 overflow-x-auto break-all">
                                 {position}
                             </div>
 
@@ -693,107 +702,77 @@ const ChessboardPopup = ({
                             </div>
                         </div>
 
-                        {/* Note */}
-                        <div className="mt-4 px-4 py-3 bg-gray-700 border-b border-gray-600 rounded">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-medium text-gray-300 mb-1">
-                                    Nota sulla posizione
-                                </h3>
-                                {!isEditingNote ? (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsEditingNote(true);
-                                        }}
-                                        className="text-xs text-indigo-400 hover:text-indigo-300"
-                                    >
-                                        Modifica
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            saveNote();
-                                        }}
-                                        className="text-xs text-green-400 hover:text-green-300"
-                                    >
-                                        Salva
-                                    </button>
-                                )}
-                            </div>
-
-                            {!isEditingNote ? (
-                                <div className="text-white text-sm bg-gray-800 p-3 rounded overflow-auto max-h-32 whitespace-pre-wrap">
-                                    {currentNote || (
-                                        <span className="text-gray-500 italic">Nessuna nota</span>
-                                    )}
-                                </div>
-                            ) : (
-                                <textarea
-                                    value={currentNote}
-                                    onChange={(e) => setCurrentNote(e.target.value)}
-                                    className="w-full bg-gray-800 text-white text-sm p-3 rounded mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    rows={4}
-                                    placeholder="Inserisci una nota per questa posizione..."
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            )}
+                        {/* Note desktop - sempre modificabili */}
+                        <div className="mt-4 bg-gray-700 rounded-md p-3">
+                            <h3 className="text-sm font-medium text-gray-300 mb-2">
+                                Note sulla posizione
+                            </h3>
+                            <textarea
+                                value={currentNote}
+                                onChange={handleNoteChange}
+                                onKeyDown={handleNoteKeyDown}
+                                onBlur={saveNote}
+                                className="w-full bg-gray-800 text-white text-sm p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                rows={4}
+                                placeholder="Inserisci note sulla posizione... (Premi Invio per salvare)"
+                                onClick={(e) => e.stopPropagation()}
+                            />
                         </div>
-
-                        {/* Info sul nodo iniziale per debug/test */}
-                        {initialNodeId && (
-                            <div className="mt-4 text-xs text-gray-400">
-                                <span className="italic">Nodo iniziale:</span> {initialNodeId}
-                                {initialNodeId === selectedNodeId ? ' (selezionato)' : ''}
-                            </div>
-                        )}
-                        {showChildSelector && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                                <div className="bg-gray-800 p-4 rounded-lg shadow-lg max-w-md w-full">
-                                    <h3 className="text-lg font-medium text-white mb-3">
-                                        Seleziona variante
-                                    </h3>
-                                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                                        {childrenOptions.map((child) => (
-                                            <button
-                                                key={child.id}
-                                                onClick={() => handleChildSelect(child.id)}
-                                                className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center"
-                                            >
-                                                <span className="flex-1">{child.label}</span>
-                                                <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    className="h-5 w-5"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="mt-4 flex justify-end">
-                                        <button
-                                            onClick={() => setShowChildSelector(false)}
-                                            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-500"
-                                        >
-                                            Annulla
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
+
+                {/* Dialog selettore varianti */}
+                {showChildSelector && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+                        onClick={() => setShowChildSelector(false)}
+                    >
+                        <div
+                            className="bg-gray-800 p-4 rounded-lg shadow-lg max-w-md w-full mx-4"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h3 className="text-lg font-medium text-white mb-3">
+                                Seleziona variante
+                            </h3>
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {childrenOptions.map((child) => (
+                                    <button
+                                        key={child.id}
+                                        onClick={() => handleChildSelect(child.id)}
+                                        className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 text-white rounded flex items-center"
+                                    >
+                                        <span className="flex-1">{child.label}</span>
+                                        <svg
+                                            className="h-5 w-5"
+                                            viewBox="0 0 20 20"
+                                            fill="currentColor"
+                                        >
+                                            <path
+                                                fillRule="evenodd"
+                                                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                                                clipRule="evenodd"
+                                            />
+                                        </svg>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                                <button
+                                    onClick={() => setShowChildSelector(false)}
+                                    className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-500"
+                                >
+                                    Annulla
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
 
+// PropTypes
 ChessboardPopup.propTypes = {
     pgn: PropTypes.string.isRequired,
     onClose: PropTypes.func.isRequired,

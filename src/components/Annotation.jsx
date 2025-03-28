@@ -191,13 +191,23 @@ const Annotation = ({
         if (isDragging || isResizing) {
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener('touchmove', handleTouchMove, { passive: false });
+            window.addEventListener('touchend', handleTouchEnd);
+            window.addEventListener('touchcancel', handleTouchEnd);
         } else {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleTouchEnd);
+            window.removeEventListener('touchcancel', handleTouchEnd);
         }
+
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', handleTouchEnd);
+            window.removeEventListener('touchcancel', handleTouchEnd);
         };
     }, [isDragging, isResizing]);
 
@@ -219,6 +229,55 @@ const Annotation = ({
             textareaRef.current.focus();
         }
     }, [isEditing]);
+    const handleTouchStart = (e) => {
+        if (isEditing || isResizing || e.target.classList.contains('resize-handle')) return;
+        setIsDragging(true);
+        onSelect();
+
+        const touch = e.touches[0];
+        dragOffset.current = {
+            x: touch.clientX - annotation.x,
+            y: touch.clientY - annotation.y,
+        };
+        if (onDragStart) onDragStart();
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    // Aggiungi handleTouchMove
+    const handleTouchMove = (e) => {
+        if (isDragging) {
+            const touch = e.touches[0];
+            const newX = touch.clientX - dragOffset.current.x;
+            const newY = touch.clientY - dragOffset.current.y;
+            updateAnnotation({
+                ...annotation,
+                x: newX,
+                y: newY,
+            });
+        } else if (isResizing) {
+            const touch = e.touches[0];
+            const dx = touch.clientX - resizeStart.current.x;
+            const dy = touch.clientY - resizeStart.current.y;
+            updateAnnotation({
+                ...annotation,
+                width: Math.max(100, resizeStart.current.width + dx),
+                height: Math.max(50, resizeStart.current.height + dy),
+            });
+        }
+        e.preventDefault();
+    };
+
+    // Aggiungi handleTouchEnd
+    const handleTouchEnd = () => {
+        if (isDragging) {
+            setIsDragging(false);
+            if (onDragEnd) onDragEnd();
+        }
+        if (isResizing) {
+            setIsResizing(false);
+        }
+    };
 
     const annotationClass = `absolute rounded shadow-lg overflow-hidden
         ${isSelected ? 'ring-2 ring-indigo-500 z-10' : 'z-1'}
@@ -242,6 +301,7 @@ const Annotation = ({
             onClick={handleClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            onTouchStart={handleTouchStart}
         >
             {isEditing ? (
                 <textarea
