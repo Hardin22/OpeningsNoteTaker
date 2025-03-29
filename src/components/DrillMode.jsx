@@ -35,7 +35,10 @@ const DrillMode = ({ onClose }) => {
     const startSize = useRef(0);
     const containerRef = useRef(null);
     const [zoomLevel, setZoomLevel] = useState(0);
+    const [selectedSquare, setSelectedSquare] = useState(null);
 
+    const [squareStyles, setSquareStyles] = useState({});
+    const [isDragging, setIsDragging] = useState(false);
     // Funzioni per gestire lo zoom
     const zoomIn = () => {
         setZoomLevel((prev) => {
@@ -195,32 +198,47 @@ const DrillMode = ({ onClose }) => {
 
     // MODIFICA: Migliorato per mostrare il messaggio di completamento
     const handlePieceDrop = (sourceSquare, targetSquare) => {
-        if (gameOver || gameRef.current.turn() !== playerColor) return false;
+        if (gameOver || gameRef.current.turn() !== playerColor) {
+            setSelectedSquare(null);
+            return false;
+        }
+
         try {
             const moveObj = { from: sourceSquare, to: targetSquare, promotion: 'q' };
             const tempGame = new Chess(gameRef.current.fen());
             const userMove = tempGame.move(moveObj);
-            if (!userMove) return false;
+
+            if (!userMove) {
+                setSelectedSquare(null);
+                return false;
+            }
 
             const expectedMove = activeMoves[currentMoveIndexRef.current];
             if (userMove.san !== expectedMove) {
                 setErrorMessage(`Mossa errata! Atteso: ${expectedMove}`);
                 setTimeout(() => setErrorMessage(''), 1000);
+                setSelectedSquare(null);
                 return false;
             }
 
+            // Esegue la mossa dell'utente
             const result = gameRef.current.move(moveObj);
             setPosition(gameRef.current.fen());
             setMoveHistory((prev) => [...prev, result]);
             currentMoveIndexRef.current++;
 
-            // Verifica se la linea è completata dopo la mossa dell'utente
+            // Evidenzia immediatamente la mossa dell'utente
+            applyHighlightToMove(sourceSquare, targetSquare);
+            setSelectedSquare(null);
+
+            // Verifica se la linea è completata
             if (currentMoveIndexRef.current === activeMoves.length) {
                 setGameOver(true);
                 setMessage('Linea completata con successo!');
                 return true;
             }
 
+            // Esegue la mossa del computer dopo un breve ritardo
             if (!gameRef.current.isGameOver() && gameRef.current.turn() !== playerColor) {
                 setTimeout(() => {
                     const compExpected = activeMoves[currentMoveIndexRef.current];
@@ -230,7 +248,10 @@ const DrillMode = ({ onClose }) => {
                         setMoveHistory((prev) => [...prev, compResult]);
                         currentMoveIndexRef.current++;
 
-                        // Verifica se la linea è completata dopo la mossa del computer
+                        // Evidenzia immediatamente la mossa del computer
+                        applyHighlightToMove(compResult.from, compResult.to);
+
+                        // Verifica se la linea è completata
                         if (currentMoveIndexRef.current === activeMoves.length) {
                             setGameOver(true);
                             setMessage('Linea completata con successo!');
@@ -241,12 +262,127 @@ const DrillMode = ({ onClose }) => {
             return true;
         } catch (error) {
             console.error("Errore durante l'esecuzione della mossa:", error);
+            setSelectedSquare(null);
             return false;
         }
     };
+ 
 
+    
+
+    const applyHighlightToMove = (from, to) => {
+        setSquareStyles({
+            [from]: { backgroundColor: 'rgba(255, 170, 0, 0.5)' },
+            [to]: { backgroundColor: 'rgba(255, 170, 0, 0.5)' },
+        });
+    };
+
+    // Aggiungi questa funzione per gestire il click su una casella
+    const showLegalMoves = useCallback((square) => {
+        if (!square) return {};
+
+        const moves = {};
+        const legalMoves = gameRef.current.moves({
+            square: square,
+            verbose: true,
+        });
+
+        legalMoves.forEach((move) => {
+            moves[move.to] = {
+                background: `radial-gradient(circle, rgba(0, 0, 0, 0.4) 19%, transparent 20%)`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+            };
+        });
+
+        // Evidenzia la casella selezionata
+        moves[square] = {
+            backgroundColor: 'rgba(0, 128, 255, 0.4)',
+        };
+
+        return moves;
+    }, []);
+
+    // Semplifica onSquareClick
+    const onSquareClick = useCallback(
+        (square) => {
+            if (gameOver || gameRef.current.turn() !== playerColor) return;
+
+            // Caso 1: Clicco sulla casella già selezionata (deseleziona)
+            if (selectedSquare === square) {
+                setSelectedSquare(null);
+                // Se c'è una mossa precedente, la reevidenziamo
+                if (moveHistory.length > 0) {
+                    const lastHistoryMove = moveHistory[moveHistory.length - 1];
+                    applyHighlightToMove(lastHistoryMove.from, lastHistoryMove.to);
+                } else {
+                    setSquareStyles({});
+                }
+                return;
+            }
+
+            // Caso 2: C'è già una casella selezionata
+            if (selectedSquare) {
+                // Ottieni il pezzo nella casella di destinazione
+                const targetPiece = gameRef.current.get(square);
+
+                // Se è un pezzo del nostro colore, lo selezioniamo
+                if (targetPiece && targetPiece.color === playerColor) {
+                    setSelectedSquare(square);
+                    setSquareStyles(showLegalMoves(square));
+                    return;
+                }
+
+                // Prova a fare la mossa
+                const tempGame = new Chess(gameRef.current.fen());
+                const isLegalMove = tempGame.move({
+                    from: selectedSquare,
+                    to: square,
+                    promotion: 'q',
+                });
+
+                if (isLegalMove) {
+                    // Se è una mossa valida, la eseguiamo
+                    handlePieceDrop(selectedSquare, square);
+                } else {
+                    // Se non è valida, deseleziona e mostra l'ultima mossa
+                    setSelectedSquare(null);
+                    if (moveHistory.length > 0) {
+                        const lastHistoryMove = moveHistory[moveHistory.length - 1];
+                        applyHighlightToMove(lastHistoryMove.from, lastHistoryMove.to);
+                    } else {
+                        setSquareStyles({});
+                    }
+                }
+            } else {
+                // Caso 3: Nuova selezione
+                const piece = gameRef.current.get(square);
+                if (piece && piece.color === playerColor) {
+                    setSelectedSquare(square);
+                    setSquareStyles(showLegalMoves(square));
+                }
+            }
+        },
+        [selectedSquare, playerColor, gameOver, moveHistory, showLegalMoves, handlePieceDrop]
+    );
+
+        
     const isDraggablePiece = ({ piece }) => !gameOver && piece.charAt(0) === playerColor;
 
+    const onPieceDragBegin = useCallback(
+        (piece, sourceSquare) => {
+            if (gameRef.current.turn() === playerColor && piece[0] === playerColor) {
+                setIsDragging(true);
+                setSelectedSquare(sourceSquare);
+                setSquareStyles(showLegalMoves(sourceSquare));
+            }
+        },
+        [playerColor, showLegalMoves]
+    );
+    const onPieceDragEnd = useCallback(() => {
+        setIsDragging(false);
+        // Non ripuliamo immediatamente gli stili qui, perché handlePieceDrop si occuperà di farlo se la mossa è valida
+    }, []);
     if (showColorSelection) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm"
@@ -444,6 +580,12 @@ const DrillMode = ({ onClose }) => {
                                 isDraggablePiece={isDraggablePiece}
                                 customPieces={customPieces}
                                 arePremovesAllowed={true}
+                                clearPremovesOnRightClick={true}
+                                customSquareStyles={squareStyles}
+                                onSquareClick={onSquareClick}
+                                onPieceDragBegin={onPieceDragBegin}
+                                
+                                onPieceDragEnd={onPieceDragEnd}
                             />
                         </div>
 
@@ -538,7 +680,7 @@ const DrillMode = ({ onClose }) => {
                     {/* Pannello desktop - visibile solo su schermi grandi */}
                     <div
                         className="hidden md:block md:w-1/3 bg-gray-800 p-4 overflow-y-auto"
-                        style={{userSelect: 'none', WebkitUserSelect: 'none' }}
+                        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
                     >
                         <h3 className="text-lg font-medium text-white mb-3">
                             Dettagli allenamento

@@ -31,8 +31,8 @@ const createPieceComponent = (imgSrc) => {
                     src={imgSrc}
                     alt="chess piece"
                     style={{
-                        width: '100%',
-                        height: '100%',
+                        width: '80%',
+                        height: '80%',
                         objectFit: 'contain',
                         // Disabilitiamo solo la selezione del testo e il drag nativo
                         userSelect: 'none',
