@@ -1,9 +1,9 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Canvas from './components/Canvas';
+import ChessboardPopup from './components/ChessboardPopup';
+import DrillMode from './components/DrillMode';
 import Sidebar from './components/Sidebar';
 import { generatePGN } from './utils/chessLogic';
-import ChessboardPopup from './components/ChessboardPopup';
-import DrillMode from './components/DrillMode'; 
 function App() {
     // Stato iniziale del canvas
     const [canvasData, setCanvasData] = useState({
@@ -210,15 +210,15 @@ function App() {
             }
         }
     };
-        // Aggiungi questa funzione per gestire l'aggiornamento e la selezione in un'unica operazione
+    // Aggiungi questa funzione per gestire l'aggiornamento e la selezione in un'unica operazione
     const handleUpdateCanvasAndSelectNode = useCallback((updatedCanvasData, newNodeId) => {
         // Aggiorna il canvas e seleziona il nuovo nodo in un'unica operazione di stato
-        setCanvasData(prev => {
+        setCanvasData((prev) => {
             const newCanvasData = updatedCanvasData || prev;
-            
+
             // Dopo l'aggiornamento del canvas, seleziona il nodo
             if (newNodeId) {
-                const newNode = newCanvasData.nodes.find(node => node.id === newNodeId);
+                const newNode = newCanvasData.nodes.find((node) => node.id === newNodeId);
                 if (newNode) {
                     // Aggiorna selectedNode solo dopo che canvasData è stato aggiornato
                     setTimeout(() => {
@@ -226,7 +226,7 @@ function App() {
                     }, 0);
                 }
             }
-            
+
             return newCanvasData;
         });
     }, []);
@@ -281,26 +281,28 @@ function App() {
         // Salva in localStorage
         localStorage.setItem('canvasData', JSON.stringify(newCanvasData));
     };
-    
+
     // Nella sezione di rendering, passa la nuova prop al ChessboardPopup
-    {isChessboardOpen && selectedNode && (
-        <ChessboardPopup
-            pgn={currentPGN}
-            onClose={handleCloseChessboard}
-            nodeDescription={selectedNode.description}
-            canvasData={canvasData}
-            selectedNodeId={selectedNode.id}
-            onUpdateCanvas={handleUpdateCanvasFromChessboard}
-            onSelectNode={handleNodeSelect}
-            onUpdateCanvasAndSelectNode={handleUpdateCanvasAndSelectNode} // Nuova prop
-        />
-    )}
+    {
+        isChessboardOpen && selectedNode && (
+            <ChessboardPopup
+                pgn={currentPGN}
+                onClose={handleCloseChessboard}
+                nodeDescription={selectedNode.description}
+                canvasData={canvasData}
+                selectedNodeId={selectedNode.id}
+                onUpdateCanvas={handleUpdateCanvasFromChessboard}
+                onSelectNode={handleNodeSelect}
+                onUpdateCanvasAndSelectNode={handleUpdateCanvasAndSelectNode} // Nuova prop
+            />
+        );
+    }
 
     // Listener per tasti (x per cancellare, Ctrl+B per aprire scacchiera)
     useEffect(() => {
         const handleKeyDown = (e) => {
             // Shortcut per aprire la scacchiera (Ctrl+B)
-            if (e.key === 'b' && e.ctrlKey && selectedNode ) {
+            if (e.key === 'b' && e.ctrlKey && selectedNode) {
                 e.preventDefault();
                 setIsChessboardOpen(true);
             }
