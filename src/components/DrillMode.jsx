@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import PropTypes from 'prop-types';
-
+import customPieces from '../utils/customPieces';
 const hardcodedPGN =
     '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. f3 g6 6. c4 Bg7 7. Be3 O-O 8. Qd2 Nc6 9. Nc3';
 
@@ -249,7 +249,8 @@ const DrillMode = ({ onClose }) => {
 
     if (showColorSelection) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm"
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
                 <div className="bg-gray-800 rounded-lg shadow-2xl overflow-hidden max-w-5xl w-full mx-4">
                     <div className="flex justify-between items-center p-4 border-b border-gray-700">
                         <h2 className="text-xl font-semibold text-white">Allenamento (Drill)</h2>
@@ -410,7 +411,11 @@ const DrillMode = ({ onClose }) => {
                             style={{
                                 width: `${boardSize}px`,
                                 height: `${boardSize}px`,
-                                maxWidth: '95vw', // Garantisce che non esca mai dallo schermo
+                                maxWidth: '95vw',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none', // Garantisce che non esca mai dallo schermo
                             }}
                         >
                             <div
@@ -431,12 +436,14 @@ const DrillMode = ({ onClose }) => {
                             <Chessboard
                                 position={position}
                                 boardWidth={boardSize}
-                                areArrowsAllowed={false}
-                                customDarkSquareStyle={{ backgroundColor: '#4b7399' }}
-                                customLightSquareStyle={{ backgroundColor: '#eae9d2' }}
+                                areArrowsAllowed={true}
+                                customDarkSquareStyle={{ backgroundColor: '#ad7456' }}
+                                customLightSquareStyle={{ backgroundColor: '#ead8c0' }}
                                 onPieceDrop={handlePieceDrop}
                                 boardOrientation={playerColor === 'b' ? 'black' : 'white'}
                                 isDraggablePiece={isDraggablePiece}
+                                customPieces={customPieces}
+                                arePremovesAllowed={true}
                             />
                         </div>
 
@@ -529,7 +536,10 @@ const DrillMode = ({ onClose }) => {
                     </div>
 
                     {/* Pannello desktop - visibile solo su schermi grandi */}
-                    <div className="hidden md:block md:w-1/3 bg-gray-800 p-4 overflow-y-auto">
+                    <div
+                        className="hidden md:block md:w-1/3 bg-gray-800 p-4 overflow-y-auto"
+                        style={{userSelect: 'none', WebkitUserSelect: 'none' }}
+                    >
                         <h3 className="text-lg font-medium text-white mb-3">
                             Dettagli allenamento
                         </h3>
@@ -611,7 +621,6 @@ const DrillMode = ({ onClose }) => {
 
                         {/* Controlli zoom - solo desktop */}
                         <div className="relative border-t border-gray-700 pt-4">
-                            
                             <div className="flex justify-center space-x-4">
                                 <button
                                     onClick={zoomOut}

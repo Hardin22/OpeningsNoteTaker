@@ -3,7 +3,7 @@ import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import PropTypes from 'prop-types';
 import { createNodeWithOptimalPosition } from '../utils/layoutUtils';
-
+import customPieces from '../utils/customPieces';
 const ChessboardPopup = ({
     pgn,
     onClose,
@@ -506,16 +506,22 @@ const ChessboardPopup = ({
                                 width: `${boardSize}px`,
                                 height: `${boardSize}px`,
                                 maxWidth: '100%',
+                                borderRadius: '10px',
+                                overflow: 'hidden' ,
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none'
                             }}
                         >
                             <Chessboard
                                 id="responsive-board"
                                 position={position}
                                 boardWidth={boardSize}
-                                areArrowsAllowed={false}
-                                customDarkSquareStyle={{ backgroundColor: '#4b7399' }}
-                                customLightSquareStyle={{ backgroundColor: '#eae9d2' }}
+                                areArrowsAllowed={true}
+                                customDarkSquareStyle={{ backgroundColor: '#ad7456' }}
+                                customLightSquareStyle={{ backgroundColor: '#ead8c0' }}
                                 onPieceDrop={handlePieceDrop}
+                                customPieces={customPieces}
+
                             />
                         </div>
 
