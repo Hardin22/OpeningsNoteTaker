@@ -551,7 +551,7 @@ const Canvas = ({
             {/* Barra dei controlli unificata in basso a destra */}
             <div className="fixed bottom-4 right-4 z-50 flex items-center space-x-2">
                 {/* Pulsante scorciatoie - nascosto su mobile */}
-                <div className="relative group hidden md:block">
+                <div className="relative group  md:block">
                     <button
                         className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
                         title="Scorciatoie"
@@ -559,17 +559,14 @@ const Canvas = ({
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             className="h-5 w-5"
-                            fill="none"
                             viewBox="0 0 24 24"
+                            fill="none"
                             stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M8 9l3 3-3 3M13 15h3"
-                            />
-                            <rect x="4" y="4" width="16" height="16" rx="2" strokeWidth={1.5} />
+                            <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"></path>
                         </svg>
                     </button>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute bottom-full right-0 mb-2 bg-black/70 text-white text-sm p-3 rounded min-w-[200px] whitespace-pre-line z-50">
@@ -589,16 +586,17 @@ const Canvas = ({
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-5 w-5"
-                        fill="none"
                         viewBox="0 0 24 24"
+                        fill="none"
                         stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                     >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                        />
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
                     </svg>
                 </button>
 

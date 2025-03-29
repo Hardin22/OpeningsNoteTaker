@@ -4,6 +4,7 @@ import { Chess } from 'chess.js';
 import PropTypes from 'prop-types';
 import { createNodeWithOptimalPosition } from '../utils/layoutUtils';
 import customPieces from '../utils/customPieces';
+
 const ChessboardPopup = ({
     pgn,
     onClose,
@@ -24,6 +25,11 @@ const ChessboardPopup = ({
     const [childrenOptions, setChildrenOptions] = useState([]);
     const [showChildSelector, setShowChildSelector] = useState(false);
     const [showMobilePanel, setShowMobilePanel] = useState(false);
+
+    // Nuovi stati per highlighting e mosse legali
+    const [selectedSquare, setSelectedSquare] = useState(null);
+    const [squareStyles, setSquareStyles] = useState({});
+    const [isDragging, setIsDragging] = useState(false);
 
     // Riferimenti
     const parentNodeMap = useRef({});
@@ -129,6 +135,12 @@ const ChessboardPopup = ({
             nodePgnMap.current = pgnMap;
         }
 
+        // Evidenzia l'ultima mossa dopo il caricamento se esiste
+        if (history.length > 0) {
+            const lastMove = history[history.length - 1];
+            applyHighlightToMove(lastMove.from, lastMove.to);
+        }
+
         return () => {
             currentGame.reset();
         };
@@ -160,8 +172,44 @@ const ChessboardPopup = ({
         return nodes.find((node) => node.id === nodeId);
     };
 
+    // NUOVA FUNZIONE: Evidenzia le caselle di partenza e arrivo di una mossa
+    const applyHighlightToMove = useCallback((from, to) => {
+        if (!from || !to) return;
+        
+        setSquareStyles({
+            [from]: { backgroundColor: 'rgba(255, 170, 0, 0.5)' },
+            [to]: { backgroundColor: 'rgba(255, 170, 0, 0.5)' }
+        });
+    }, []);
+
+    // NUOVA FUNZIONE: Mostra le mosse legali per un pezzo selezionato
+    const showLegalMoves = useCallback((square) => {
+        if (!square) return {};
+
+        const moves = {};
+        const legalMoves = gameRef.current.moves({
+            square: square,
+            verbose: true,
+        });
+
+        legalMoves.forEach((move) => {
+            moves[move.to] = {
+                background: `radial-gradient(circle, rgba(0, 0, 0, 0.4) 19%, transparent 20%)`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+            };
+        });
+
+        // Evidenzia la casella selezionata
+        moves[square] = {
+            backgroundColor: 'rgba(0, 128, 255, 0.4)',
+        };
+
+        return moves;
+    }, []);
+
     // Naviga ad un nodo specifico
-    const navigateToNode = (nodeId) => {
+    const navigateToNode = useCallback((nodeId) => {
         if (!nodeId || !internalCanvasData) return;
 
         const targetNode = findNodeById(internalCanvasData.nodes, nodeId);
@@ -179,6 +227,15 @@ const ChessboardPopup = ({
             setPosition(gameRef.current.fen());
             setMoveHistory(history);
             setCurrentIndex(history.length - 1);
+            setSelectedSquare(null);
+
+            // Evidenzia l'ultima mossa caricata
+            if (history.length > 0) {
+                const lastMove = history[history.length - 1];
+                applyHighlightToMove(lastMove.from, lastMove.to);
+            } else {
+                setSquareStyles({});
+            }
 
             if (nodeId !== selectedNodeId) {
                 safeSelectNode(nodeId);
@@ -193,10 +250,10 @@ const ChessboardPopup = ({
         } catch (error) {
             console.error('Errore nella navigazione al nodo:', error);
         }
-    };
+    }, [internalCanvasData, pgn, selectedNodeId, safeSelectNode, applyHighlightToMove]);
 
     // Funzione per navigare a una mossa specifica
-    const navigateToMove = (index) => {
+    const navigateToMove = useCallback((index) => {
         try {
             gameRef.current.reset();
 
@@ -206,30 +263,39 @@ const ChessboardPopup = ({
                         gameRef.current.move(moveHistory[i]);
                     }
                 }
+                
+                // Evidenzia l'ultima mossa navigata
+                if (index >= 0 && moveHistory[index]) {
+                    applyHighlightToMove(moveHistory[index].from, moveHistory[index].to);
+                }
+            } else {
+                // Se torniamo all'inizio, rimuovi tutte le evidenziazioni
+                setSquareStyles({});
             }
 
             setPosition(gameRef.current.fen());
             setCurrentIndex(index);
+            setSelectedSquare(null);
         } catch (error) {
             console.error('Errore nella navigazione:', error);
         }
-    };
+    }, [moveHistory, applyHighlightToMove]);
 
     // FUNZIONI DI NAVIGAZIONE
-    const goToStart = () => {
+    const goToStart = useCallback(() => {
         navigateToMove(-1);
-    };
+    }, [navigateToMove]);
 
-    const goToPrevious = () => {
+    const goToPrevious = useCallback(() => {
         if (selectedNodeId && parentNodeMap.current[selectedNodeId]) {
             const parentId = parentNodeMap.current[selectedNodeId];
             navigateToNode(parentId);
         } else {
             currentIndex > -1 && navigateToMove(currentIndex - 1);
         }
-    };
+    }, [selectedNodeId, currentIndex, navigateToNode, navigateToMove]);
 
-    const goToNext = () => {
+    const goToNext = useCallback(() => {
         if (currentIndex < moveHistory.length - 1) {
             navigateToMove(currentIndex + 1);
             return;
@@ -259,34 +325,138 @@ const ChessboardPopup = ({
                 setShowChildSelector(true);
             }
         }
-    };
+    }, [currentIndex, moveHistory, selectedNodeId, internalCanvasData, navigateToMove, navigateToNode]);
 
-    const handleChildSelect = (nodeId) => {
+    const handleChildSelect = useCallback((nodeId) => {
         setShowChildSelector(false);
         navigateToNode(nodeId);
-    };
+    }, [navigateToNode]);
 
-    const goToEnd = () => {
+    const goToEnd = useCallback(() => {
         navigateToMove(moveHistory.length - 1);
-    };
+    }, [moveHistory, navigateToMove]);
 
-    const goToInitialNode = () => {
+    const goToInitialNode = useCallback(() => {
         if (initialNodeId) {
             navigateToNode(initialNodeId);
         }
-    };
+    }, [initialNodeId, navigateToNode]);
 
-    const handlePieceDrop = (sourceSquare, targetSquare) => {
+    // NUOVA FUNZIONE: Gestisce il click sulle caselle della scacchiera
+    const onSquareClick = useCallback((square) => {
+        // Se siamo all'ultima mossa della storia, consenti interazione
+        const isAtLatestMove = currentIndex === moveHistory.length - 1;
+        if (!isAtLatestMove) return;
+
+        // Caso 1: Clicco sulla casella già selezionata (deseleziona)
+        if (selectedSquare === square) {
+            setSelectedSquare(null);
+            // Se c'è una mossa precedente, la reevidenziamo
+            if (moveHistory.length > 0 && currentIndex >= 0) {
+                const lastHistoryMove = moveHistory[currentIndex];
+                applyHighlightToMove(lastHistoryMove.from, lastHistoryMove.to);
+            } else {
+                setSquareStyles({});
+            }
+            return;
+        }
+        
+        // Caso 2: C'è già una casella selezionata
+        if (selectedSquare) {
+            // Ottieni il pezzo nella casella di destinazione
+            const targetPiece = gameRef.current.get(square);
+            
+            // Se è un pezzo dello stesso colore, cambia selezione
+            const turn = gameRef.current.turn();
+            if (targetPiece && targetPiece.color === turn) {
+                setSelectedSquare(square);
+                setSquareStyles(showLegalMoves(square));
+                return;
+            }
+            
+            // Prova a fare la mossa
+            const tempGame = new Chess(gameRef.current.fen());
+            const isLegalMove = tempGame.move({
+                from: selectedSquare,
+                to: square,
+                promotion: 'q',
+            });
+            
+            if (isLegalMove) {
+                // Se è una mossa valida, la eseguiamo
+                handlePieceDrop(selectedSquare, square);
+            } else {
+                // Se non è valida, deseleziona e mostra l'ultima mossa
+                setSelectedSquare(null);
+                if (moveHistory.length > 0 && currentIndex >= 0) {
+                    const lastHistoryMove = moveHistory[currentIndex];
+                    applyHighlightToMove(lastHistoryMove.from, lastHistoryMove.to);
+                } else {
+                    setSquareStyles({});
+                }
+            }
+        } else {
+            // Caso 3: Nuova selezione
+            const piece = gameRef.current.get(square);
+            const turn = gameRef.current.turn();
+            if (piece && piece.color === turn) {
+                setSelectedSquare(square);
+                setSquareStyles(showLegalMoves(square));
+            }
+        }
+    }, [selectedSquare, moveHistory, currentIndex, showLegalMoves, applyHighlightToMove]);
+
+    // NUOVE FUNZIONI: Gestione del trascinamento dei pezzi
+    const onPieceDragBegin = useCallback((piece, sourceSquare) => {
+        // Verifica che si stia interagendo con la posizione attuale
+        const isAtLatestMove = currentIndex === moveHistory.length - 1;
+        if (!isAtLatestMove) return;
+        
+        const turn = gameRef.current.turn();
+        if (piece[0] === turn) {
+            setIsDragging(true);
+            setSelectedSquare(sourceSquare);
+            setSquareStyles(showLegalMoves(sourceSquare));
+        }
+    }, [currentIndex, moveHistory.length, showLegalMoves]);
+
+    const onPieceDragEnd = useCallback(() => {
+        setIsDragging(false);
+        // handlePieceDrop si occuperà di gestire gli stili se la mossa è valida
+    }, []);
+
+    // Aggiorna handlePieceDrop per includere l'highlighting
+    const handlePieceDrop = useCallback((sourceSquare, targetSquare) => {
+        // Verifica che siamo all'ultima mossa della storia
+        const isAtLatestMove = currentIndex === moveHistory.length - 1;
+        if (!isAtLatestMove) return false;
+
         try {
             const moveObj = { from: sourceSquare, to: targetSquare, promotion: 'q' };
             const result = gameRef.current.move(moveObj);
 
             if (!result) {
+                // Se la mossa non è valida, pulisci la selezione e mostra l'ultima mossa evidenziata
+                setSelectedSquare(null);
+                if (moveHistory.length > 0 && currentIndex >= 0) {
+                    const lastMove = moveHistory[currentIndex];
+                    applyHighlightToMove(lastMove.from, lastMove.to);
+                }
                 return false;
             }
 
             setPosition(gameRef.current.fen());
 
+            // Evidenzia immediatamente la mossa eseguita
+            applyHighlightToMove(sourceSquare, targetSquare);
+            setSelectedSquare(null);
+
+            // Aggiorna la storia delle mosse
+            const newHistory = [...moveHistory.slice(0, currentIndex + 1), result];
+            setMoveHistory(newHistory);
+            setCurrentIndex(currentIndex + 1);
+
+            // Gestione nodi - parte esistente
             if (!internalCanvasData || !selectedNodeId) {
                 return true;
             }
@@ -305,10 +475,6 @@ const ChessboardPopup = ({
                     matchingNodeId = childId;
                 }
             }
-
-            const newHistory = [...moveHistory.slice(0, currentIndex + 1), result];
-            setMoveHistory(newHistory);
-            setCurrentIndex(currentIndex + 1);
 
             if (matchingNodeId) {
                 safeSelectNode(matchingNodeId);
@@ -340,10 +506,10 @@ const ChessboardPopup = ({
             console.error("Errore nell'esecuzione della mossa:", error);
             return false;
         }
-    };
+    }, [currentIndex, moveHistory, internalCanvasData, selectedNodeId, safeSelectNode, safeUpdateCanvas, onUpdateCanvasAndSelectNode, applyHighlightToMove]);
 
     // Gestisce il salvataggio delle note con sincronizzazione migliorata
-    const saveNote = () => {
+    const saveNote = useCallback(() => {
         if (!selectedNodeId || !internalCanvasData) return;
         
         // Se la nota è invariata, non fare nulla
@@ -367,28 +533,28 @@ const ChessboardPopup = ({
         } catch (error) {
             console.error('Errore nel salvataggio della nota:', error);
         }
-    };
+    }, [selectedNodeId, internalCanvasData, currentNote, safeUpdateCanvas]);
 
     // Gestisce il cambio del testo nella textarea
-    const handleNoteChange = (e) => {
+    const handleNoteChange = useCallback((e) => {
         setCurrentNote(e.target.value);
-    };
+    }, []);
 
     // Gestisce gli eventi dei tasti nella textarea
-    const handleNoteKeyDown = (e) => {
+    const handleNoteKeyDown = useCallback((e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault(); // Impedisce l'inserimento dell'a capo
             saveNote();
             e.target.blur(); // Deseleziona il campo di testo
         }
-    };
+    }, [saveNote]);
 
-    const formatMoveNotation = (move, index) => {
+    const formatMoveNotation = useCallback((move, index) => {
         const moveNumber = Math.floor(index / 2) + 1;
         return index % 2 === 0 ? `${moveNumber}. ${move.san}` : move.san;
-    };
+    }, []);
 
-    const handleSafeClose = (e) => {
+    const handleSafeClose = useCallback((e) => {
         e.stopPropagation();
         if (isUpdatingRef.current) {
             return;
@@ -396,9 +562,9 @@ const ChessboardPopup = ({
         // Assicuriamoci che le modifiche siano salvate prima di chiudere
         saveNote();
         onClose();
-    };
+    }, [onClose, saveNote]);
 
-    const hasNextMoves = () => {
+    const hasNextMoves = useCallback(() => {
         if (currentIndex < moveHistory.length - 1) {
             return true;
         }
@@ -412,12 +578,12 @@ const ChessboardPopup = ({
         );
 
         return hasChildren;
-    };
+    }, [currentIndex, moveHistory.length, selectedNodeId, internalCanvasData]);
 
     // Toggle del pannello mobile
-    const toggleMobilePanel = () => {
+    const toggleMobilePanel = useCallback(() => {
         setShowMobilePanel(!showMobilePanel);
-    };
+    }, [showMobilePanel]);
 
     return (
         <div
@@ -507,7 +673,7 @@ const ChessboardPopup = ({
                                 height: `${boardSize}px`,
                                 maxWidth: '100%',
                                 borderRadius: '10px',
-                                overflow: 'hidden' ,
+                                overflow: 'hidden',
                                 userSelect: 'none',
                                 WebkitUserSelect: 'none'
                             }}
@@ -521,7 +687,10 @@ const ChessboardPopup = ({
                                 customLightSquareStyle={{ backgroundColor: '#ead8c0' }}
                                 onPieceDrop={handlePieceDrop}
                                 customPieces={customPieces}
-
+                                customSquareStyles={squareStyles}
+                                onSquareClick={onSquareClick}
+                                onPieceDragBegin={onPieceDragBegin}
+                                onPieceDragEnd={onPieceDragEnd}
                             />
                         </div>
 
