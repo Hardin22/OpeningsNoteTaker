@@ -913,7 +913,7 @@ const ChessboardPopup = ({
                                             d="M13 10V3L4 14h7v7l9-11h-7z"
                                         />
                                     </svg>
-                                    Analisi Engine
+                                    Analisi Engine (beta)
                                 </span>
                                 <div
                                     className={`w-10 h-5 p-1 rounded-full ${

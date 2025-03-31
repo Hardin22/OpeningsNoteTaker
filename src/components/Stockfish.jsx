@@ -64,7 +64,7 @@ export function useStockfish() {
             const basePath = import.meta.env.BASE_URL || '/';
             const workerPath = `${basePath}${
                 basePath.endsWith('/') ? '' : '/'
-            }stockfish/stockfish.wasm.js`;
+            }stockfish/stockfish.js`;
             engineWorker.current = new Worker(workerPath);
 
             engineWorker.current.onmessage = (event) => {

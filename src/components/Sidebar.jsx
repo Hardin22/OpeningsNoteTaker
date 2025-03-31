@@ -138,7 +138,7 @@ const Sidebar = ({
                         <div className="flex justify-between items-center mb-4">
                             <div className="flex items-center gap-2">
                                 <img
-                                    src="/chessnotes.svg"
+                                    src={`${import.meta.env.BASE_URL}chessnotes.svg`}
                                     alt="Chess Notes Logo"
                                     className="w-8 h-8 text-white"
                                     style={{ filter: 'brightness(0) invert(0.9) ' }}
