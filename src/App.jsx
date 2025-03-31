@@ -4,6 +4,7 @@ import ChessboardPopup from './components/ChessboardPopup';
 import DrillMode from './components/DrillMode';
 import Sidebar from './components/Sidebar';
 import { generatePGN } from './utils/chessLogic';
+
 function App() {
     // Stato iniziale del canvas
     const [canvasData, setCanvasData] = useState({

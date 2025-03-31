@@ -136,7 +136,15 @@ const Sidebar = ({
                 <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-4">
                     <div className="border-b border-gray-800 pb-4">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-gray-100">Strumenti</h2>
+                            <div className="flex items-center gap-2">
+                                <img
+                                    src="/chessnotes.svg"
+                                    alt="Chess Notes Logo"
+                                    className="w-8 h-8 text-white"
+                                    style={{ filter: 'brightness(0) invert(0.9) ' }}
+                                />
+                                <h2 className="text-xl font-bold text-gray-100">Strumenti</h2>
+                            </div>
                             {/* Pulsante di chiusura visibile solo su mobile */}
                             <button
                                 onClick={() => setIsMobileMenuOpen(false)}

@@ -4,6 +4,7 @@ import { Chess } from 'chess.js';
 import PropTypes from 'prop-types';
 import { createNodeWithOptimalPosition } from '../utils/layoutUtils';
 import customPieces from '../utils/customPieces';
+import StockfishComponent from './Stockfish';
 
 const ChessboardPopup = ({
     pgn,
@@ -42,6 +43,9 @@ const ChessboardPopup = ({
 
     // Dimensionamento della scacchiera
     const [boardSize, setBoardSize] = useState(400);
+
+    const [stockfishEnabled, setStockfishEnabled] = useState(false);
+
 
     // Gestisce il dimensionamento della scacchiera
     useEffect(() => {
@@ -585,6 +589,10 @@ const ChessboardPopup = ({
         setShowMobilePanel(!showMobilePanel);
     }, [showMobilePanel]);
 
+    const toggleStockfish = useCallback(() => {
+        setStockfishEnabled((prev) => !prev);
+    }, []);
+    
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm"
@@ -675,7 +683,7 @@ const ChessboardPopup = ({
                                 borderRadius: '10px',
                                 overflow: 'hidden',
                                 userSelect: 'none',
-                                WebkitUserSelect: 'none'
+                                WebkitUserSelect: 'none',
                             }}
                         >
                             <Chessboard
@@ -794,6 +802,19 @@ const ChessboardPopup = ({
                             }`}
                         >
                             <div className="border-t border-gray-700 pt-3">
+                                <div className="mt-3">
+                                <h4 className="text-sm font-medium text-gray-300 mb-1">Turno</h4>
+                                <div className="flex items-center">
+                                    <div
+                                        className={`w-3 h-3 rounded-full mr-2 ${
+                                            position.includes(' w ') ? 'bg-white' : 'bg-black'
+                                        }`}
+                                    ></div>
+                                    <span className="text-gray-300">
+                                        {position.includes(' w ') ? 'Bianco' : 'Nero'}
+                                    </span>
+                                </div>
+                            </div>
                                 {/* Lista mosse mobile - ALTEZZA AUMENTATA */}
                                 <h3 className="text-base font-medium text-white mb-2">
                                     Storico Mosse
@@ -828,6 +849,19 @@ const ChessboardPopup = ({
 
                     {/* Pannello laterale - visibile su desktop, nascosto su mobile */}
                     <div className="hidden md:block md:w-1/3 border-l border-gray-700 bg-gray-800 p-4 overflow-y-auto">
+                        <div className=" mb-2 ">
+                                
+                                <div className="flex items-center">
+                                    <div
+                                        className={`w-3 h-3 rounded-full mr-2 ${
+                                            position.includes(' w ') ? 'bg-white' : 'bg-black'
+                                        }`}
+                                    ></div>
+                                    <span className="text-gray-300">
+                                        {position.includes(' w ') ? 'Muove il Bianco' : 'Muove il Nero'}
+                                    </span>
+                                </div>
+                            </div>
                         <h3 className="text-lg font-medium text-white mb-3">Storico Mosse</h3>
                         <div className="bg-gray-900 rounded-md p-3 max-h-60 overflow-y-auto">
                             {moveHistory.length > 0 ? (
@@ -854,27 +888,49 @@ const ChessboardPopup = ({
                         </div>
 
                         {/* Info posizione */}
-                        <div className="mt-4">
-                            <h4 className="text-sm font-medium text-gray-300 mb-1">
-                                Posizione FEN
-                            </h4>
-                            <div className="bg-gray-900 p-2 rounded-md text-xs text-gray-400 overflow-x-auto break-all">
-                                {position}
-                            </div>
 
-                            <div className="mt-3">
-                                <h4 className="text-sm font-medium text-gray-300 mb-1">Turno</h4>
-                                <div className="flex items-center">
+                        {/* Aggiungi questo codice dopo la chiusura del div "Info posizione" */}
+                        <div className="mt-4">
+                            <button
+                                onClick={toggleStockfish}
+                                className={`flex items-center justify-between w-full p-2 rounded-md ${
+                                    stockfishEnabled
+                                        ? 'bg-indigo-600 hover:bg-indigo-700'
+                                        : 'bg-gray-700 hover:bg-gray-600'
+                                } text-white transition-colors`}
+                            >
+                                <span className="flex items-center">
+                                    <svg
+                                        className="w-5 h-5 mr-2"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M13 10V3L4 14h7v7l9-11h-7z"
+                                        />
+                                    </svg>
+                                    Analisi Engine
+                                </span>
+                                <div
+                                    className={`w-10 h-5 p-1 rounded-full ${
+                                        stockfishEnabled ? 'bg-indigo-300' : 'bg-gray-600'
+                                    }`}
+                                >
                                     <div
-                                        className={`w-3 h-3 rounded-full mr-2 ${
-                                            position.includes(' w ') ? 'bg-white' : 'bg-black'
+                                        className={`w-3 h-3 rounded-full transition-transform ${
+                                            stockfishEnabled
+                                                ? 'bg-white transform translate-x-5'
+                                                : 'bg-gray-400'
                                         }`}
-                                    ></div>
-                                    <span className="text-gray-300">
-                                        {position.includes(' w ') ? 'Bianco' : 'Nero'}
-                                    </span>
+                                    />
                                 </div>
-                            </div>
+                            </button>
+
+                            {stockfishEnabled && <StockfishComponent fen={position} />}
                         </div>
 
                         {/* Note desktop - sempre modificabili */}
@@ -892,6 +948,15 @@ const ChessboardPopup = ({
                                 placeholder="Inserisci note sulla posizione... (Premi Invio per salvare)"
                                 onClick={(e) => e.stopPropagation()}
                             />
+                        </div>
+                        <div className="mt-4">
+                            <h4 className="text-sm font-medium text-gray-300 mb-1">
+                                Posizione FEN
+                            </h4>
+                            <div className="bg-gray-900 p-2 rounded-md text-xs text-gray-400 overflow-x-auto break-all">
+                                {position}
+                            </div>
+
                         </div>
                     </div>
                 </div>

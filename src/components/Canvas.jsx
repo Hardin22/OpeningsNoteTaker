@@ -550,8 +550,8 @@ const Canvas = ({
 
             {/* Barra dei controlli unificata in basso a destra */}
             <div className="fixed bottom-4 right-4 z-50 flex items-center space-x-2">
-                {/* Pulsante scorciatoie - nascosto su mobile */}
-                <div className="relative group  md:block">
+                {/* Pulsante scorciatoie - nascosto su mobile 
+                <div className="relative group  md:block ">
                     <button
                         className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-md shadow-lg focus:outline-none flex items-center justify-center"
                         title="Scorciatoie"
@@ -576,7 +576,7 @@ const Canvas = ({
                         <p>\: elimina Nodo con figli</p>
                     </div>
                 </div>
-
+                */}
                 {/* Pulsante riorganizza - visibile anche su mobile */}
                 <button
                     onClick={handleReorganizeNodes}
@@ -599,7 +599,6 @@ const Canvas = ({
                         <rect x="3" y="14" width="7" height="7"></rect>
                     </svg>
                 </button>
-
                 {/* Pulsanti zoom - nascosti su mobile */}
                 <button
                     onClick={() => setZoom((prev) => Math.max(prev - 0.1, 0.3))}
