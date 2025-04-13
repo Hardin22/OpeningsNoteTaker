@@ -1,4 +1,3 @@
-
 {
     "$schema": "https://openapi.vercel.sh/vercel.json",
     "headers": [
@@ -17,5 +16,14 @@
         }
     ],
     "buildCommand": "npm run build",
-    "outputDirectory": "dist"
+    "outputDirectory": "dist",
+    "builds": [
+        {
+            "src": "package.json",
+            "use": "@vercel/node",
+            "config": {
+                "installCommand": "npm install"
+            }
+        }
+    ]
 }

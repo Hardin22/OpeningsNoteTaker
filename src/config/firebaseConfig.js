@@ -9,7 +9,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
     apiKey: 'AIzaSyBDdAvwL6tHB3BKYbY9rb2GsTH8yIQZtvg',
-    authDomain: 'chessnotes-a9726.firebaseapp.com',
+    authDomain: 'chessnotes-a9726.firebaseapp.com' ,
     projectId: 'chessnotes-a9726',
     storageBucket: 'chessnotes-a9726.firebasestorage.app',
     messagingSenderId: '881905560245',
