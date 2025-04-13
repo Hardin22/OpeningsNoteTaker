@@ -21,6 +21,15 @@ function App() {
     // Refs
     const isGeneratingPGN = useRef(false);
 
+    // Aggiungi una classe all'html per controllare l'overflow
+    useEffect(() => {
+        document.documentElement.classList.add('app-page');
+
+        return () => {
+            document.documentElement.classList.remove('app-page');
+        };
+    }, []);
+
     // Funzione per costruire il percorso delle mosse da un nodo alla radice
     const buildMovePath = (nodes, connections, targetNodeId) => {
         const nodesMap = new Map(nodes.map((node) => [node.id, node]));
@@ -282,6 +291,25 @@ function App() {
         // Salva in localStorage
         localStorage.setItem('canvasData', JSON.stringify(newCanvasData));
     };
+    useEffect(() => {
+        // Carica i dati dal localStorage
+        const savedData = localStorage.getItem('canvasData');
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                // Migra i nodi esistenti aggiungendo la proprietà arrows se mancante
+                if (parsed.nodes) {
+                    parsed.nodes = parsed.nodes.map((node) => ({
+                        ...node,
+                        arrows: node.arrows || [], // Aggiungi arrows se non esiste
+                    }));
+                }
+                setCanvasData(parsed);
+            } catch (e) {
+                console.error('Errore nel caricamento dei dati:', e);
+            }
+        }
+    }, []);
 
     // Nella sezione di rendering, passa la nuova prop al ChessboardPopup
     {

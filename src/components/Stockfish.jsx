@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { uciToSan } from '../utils/notation';
 import { Chess } from 'chess.js';
 
-export function useStockfish() {
+export function useStockfish(onEvaluationChange) {
     const [isReady, setIsReady] = useState(false);
     const [evaluation, setEvaluation] = useState(null);
     const [isMate, setIsMate] = useState(false);
@@ -15,6 +15,21 @@ export function useStockfish() {
     const engineWorker = useRef(null);
     const currentFen = useRef(null);
     const currentTurn = useRef('w');
+
+    // Invia la valutazione all'EvalBar quando cambia
+    useEffect(() => {
+        if (onEvaluationChange && evaluation !== null) {
+            if (isMate && mateIn !== null) {
+                // Invia lo stato di matto normalizzato in base al turno
+                const adjustedMate = currentTurn.current === 'b' ? -mateIn : mateIn;
+                onEvaluationChange(adjustedMate > 0 ? 'mate' : '-mate');
+            } else {
+                // Invia la valutazione normalizzata in base al turno
+                const adjustedEval = currentTurn.current === 'b' ? -evaluation : evaluation;
+                onEvaluationChange(adjustedEval);
+            }
+        }
+    }, [evaluation, isMate, mateIn, onEvaluationChange]);
 
     // Funzione ottimizzata per estrarre il turno dal FEN
     const extractTurnFromFen = useCallback((fen) => {
@@ -64,11 +79,15 @@ export function useStockfish() {
             const basePath = import.meta.env.BASE_URL || '/';
             const workerPath = `${basePath}${
                 basePath.endsWith('/') ? '' : '/'
-            }stockfish/stockfish.js`;
+            }stockfish/stockfish-nnue-16.js`;
             engineWorker.current = new Worker(workerPath);
 
             engineWorker.current.onmessage = (event) => {
                 const message = event.data;
+
+                if (message.startsWith('id name')) {
+                    console.log('Versione engine:', message);
+                }
 
                 if (message === 'readyok') {
                     setIsReady(true);
@@ -198,6 +217,11 @@ export function useStockfish() {
     const analyzeFen = useCallback(
         (fen, maxDepth = 20) => {
             if (engineWorker.current && isReady) {
+                // Interrompi qualsiasi analisi in corso
+                if (isAnalyzing) {
+                    engineWorker.current.postMessage('stop');
+                }
+
                 currentFen.current = fen;
                 currentTurn.current = extractTurnFromFen(fen);
 
@@ -214,7 +238,7 @@ export function useStockfish() {
                 engineWorker.current.postMessage(`go depth ${maxDepth}`);
             }
         },
-        [isReady, extractTurnFromFen]
+        [isReady, extractTurnFromFen, isAnalyzing]
     );
 
     return {
@@ -233,7 +257,7 @@ export function useStockfish() {
     };
 }
 
-export default function StockfishComponent({ fen }) {
+export default function StockfishComponent({ fen, onEvaluationChange }) {
     const {
         isReady,
         evaluation,
@@ -247,7 +271,7 @@ export default function StockfishComponent({ fen }) {
         showMultiPV,
         setShowMultiPV,
         currentTurn,
-    } = useStockfish();
+    } = useStockfish(onEvaluationChange);
     const analyzedFenRef = useRef(null);
 
     // Trigger dell'analisi quando cambia il FEN

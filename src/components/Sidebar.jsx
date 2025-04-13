@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import Tutorial from './Tutorial';
+import ImportPgnModal from './ImportPgnModal';
 const Sidebar = ({
     onAddNode,
     onAddAnnotation,
@@ -17,7 +18,7 @@ const Sidebar = ({
     const sidebarRef = useRef(null);
     const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
     const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-
+    const [isImportPgnOpen, setIsImportPgnOpen] = useState(false);
     // Gestione dell'altezza dinamica per mobile
     useEffect(() => {
         const handleResize = () => {
@@ -143,7 +144,7 @@ const Sidebar = ({
                                     className="w-8 h-8 text-white"
                                     style={{ filter: 'brightness(0) invert(0.9) ' }}
                                 />
-                                <h2 className="text-xl font-bold text-gray-100">Strumenti</h2>
+                                <h2 className="text-xl font- text-gray-100">Strumenti</h2>
                             </div>
                             {/* Pulsante di chiusura visibile solo su mobile */}
                             <button
@@ -346,6 +347,25 @@ const Sidebar = ({
                             <span className="text-sm">Importa</span>
                         </button>
                     </div>
+                    <button
+                        onClick={() => setIsImportPgnOpen(true)}
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+                    >
+                        <svg
+                            className="w-5 h-5 text-purple-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                            />
+                        </svg>
+                        <span className="text-sm">Importa PGN</span>
+                    </button>
 
                     {selectedNode && (
                         <button
@@ -397,6 +417,13 @@ const Sidebar = ({
                     className="hidden"
                 />
             </div>
+            {/* Aggiungi alla fine, prima della chiusura del componente */}
+            {isImportPgnOpen && (
+                <ImportPgnModal
+                    onClose={() => setIsImportPgnOpen(false)}
+                    setCanvasData={setCanvasData}
+                />
+            )}
 
             <Tutorial isOpen={isTutorialOpen} onClose={() => setIsTutorialOpen(false)} />
         </>

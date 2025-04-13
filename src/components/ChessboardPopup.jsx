@@ -5,7 +5,8 @@ import PropTypes from 'prop-types';
 import { createNodeWithOptimalPosition } from '../utils/layoutUtils';
 import customPieces from '../utils/customPieces';
 import StockfishComponent from './Stockfish';
-
+import OpeningExplorer from './OpeningExplorer';
+import EvalBar from './EvalBar';
 const ChessboardPopup = ({
     pgn,
     onClose,
@@ -41,11 +42,14 @@ const ChessboardPopup = ({
     const boardContainerRef = useRef(null);
     const lastSavedNoteRef = useRef('');
 
+    //eval
+    const [currentEvaluation, setCurrentEvaluation] = useState(0);
+    const [boardOrientation, setBoardOrientation] = useState('white'); // o 'black'
+
     // Dimensionamento della scacchiera
     const [boardSize, setBoardSize] = useState(400);
 
     const [stockfishEnabled, setStockfishEnabled] = useState(false);
-
 
     // Gestisce il dimensionamento della scacchiera
     useEffect(() => {
@@ -109,7 +113,7 @@ const ChessboardPopup = ({
         setPosition(currentGame.fen());
         setMoveHistory(history);
         setCurrentIndex(history.length - 1);
-        
+
         // Imposta la nota e salva il suo valore nel ref
         const noteValue = nodeDescription || '';
         setCurrentNote(noteValue);
@@ -153,10 +157,10 @@ const ChessboardPopup = ({
     const safeUpdateCanvas = useCallback(
         (updatedCanvas) => {
             if (!isMountedRef.current || !onUpdateCanvas) return;
-            
+
             // Imposta subito lo stato locale
             setInternalCanvasData(updatedCanvas);
-            
+
             // Aggiorna il canvas esterno con una leggera animazione
             onUpdateCanvas(updatedCanvas);
         },
@@ -179,10 +183,10 @@ const ChessboardPopup = ({
     // NUOVA FUNZIONE: Evidenzia le caselle di partenza e arrivo di una mossa
     const applyHighlightToMove = useCallback((from, to) => {
         if (!from || !to) return;
-        
+
         setSquareStyles({
             [from]: { backgroundColor: 'rgba(255, 170, 0, 0.5)' },
-            [to]: { backgroundColor: 'rgba(255, 170, 0, 0.5)' }
+            [to]: { backgroundColor: 'rgba(255, 170, 0, 0.5)' },
         });
     }, []);
 
@@ -213,77 +217,83 @@ const ChessboardPopup = ({
     }, []);
 
     // Naviga ad un nodo specifico
-    const navigateToNode = useCallback((nodeId) => {
-        if (!nodeId || !internalCanvasData) return;
+    const navigateToNode = useCallback(
+        (nodeId) => {
+            if (!nodeId || !internalCanvasData) return;
 
-        const targetNode = findNodeById(internalCanvasData.nodes, nodeId);
-        if (!targetNode) return;
+            const targetNode = findNodeById(internalCanvasData.nodes, nodeId);
+            if (!targetNode) return;
 
-        const nodePgn = targetNode.pgn || nodePgnMap.current[nodeId] || pgn;
+            const nodePgn = targetNode.pgn || nodePgnMap.current[nodeId] || pgn;
 
-        try {
-            gameRef.current.reset();
-            if (nodePgn && nodePgn.trim()) {
-                gameRef.current.loadPgn(nodePgn);
+            try {
+                gameRef.current.reset();
+                if (nodePgn && nodePgn.trim()) {
+                    gameRef.current.loadPgn(nodePgn);
+                }
+
+                const history = gameRef.current.history({ verbose: true });
+                setPosition(gameRef.current.fen());
+                setMoveHistory(history);
+                setCurrentIndex(history.length - 1);
+                setSelectedSquare(null);
+
+                // Evidenzia l'ultima mossa caricata
+                if (history.length > 0) {
+                    const lastMove = history[history.length - 1];
+                    applyHighlightToMove(lastMove.from, lastMove.to);
+                } else {
+                    setSquareStyles({});
+                }
+
+                if (nodeId !== selectedNodeId) {
+                    safeSelectNode(nodeId);
+                }
+
+                const node = findNodeById(internalCanvasData.nodes, nodeId);
+                if (node) {
+                    const noteValue = node.description || '';
+                    setCurrentNote(noteValue);
+                    lastSavedNoteRef.current = noteValue;
+                }
+            } catch (error) {
+                console.error('Errore nella navigazione al nodo:', error);
             }
-
-            const history = gameRef.current.history({ verbose: true });
-            setPosition(gameRef.current.fen());
-            setMoveHistory(history);
-            setCurrentIndex(history.length - 1);
-            setSelectedSquare(null);
-
-            // Evidenzia l'ultima mossa caricata
-            if (history.length > 0) {
-                const lastMove = history[history.length - 1];
-                applyHighlightToMove(lastMove.from, lastMove.to);
-            } else {
-                setSquareStyles({});
-            }
-
-            if (nodeId !== selectedNodeId) {
-                safeSelectNode(nodeId);
-            }
-
-            const node = findNodeById(internalCanvasData.nodes, nodeId);
-            if (node) {
-                const noteValue = node.description || '';
-                setCurrentNote(noteValue);
-                lastSavedNoteRef.current = noteValue;
-            }
-        } catch (error) {
-            console.error('Errore nella navigazione al nodo:', error);
-        }
-    }, [internalCanvasData, pgn, selectedNodeId, safeSelectNode, applyHighlightToMove]);
+        },
+        [internalCanvasData, pgn, selectedNodeId, safeSelectNode, applyHighlightToMove]
+    );
 
     // Funzione per navigare a una mossa specifica
-    const navigateToMove = useCallback((index) => {
-        try {
-            gameRef.current.reset();
+    const navigateToMove = useCallback(
+        (index) => {
+            try {
+                gameRef.current.reset();
 
-            if (index >= 0) {
-                for (let i = 0; i <= index; i++) {
-                    if (i < moveHistory.length) {
-                        gameRef.current.move(moveHistory[i]);
+                if (index >= 0) {
+                    for (let i = 0; i <= index; i++) {
+                        if (i < moveHistory.length) {
+                            gameRef.current.move(moveHistory[i]);
+                        }
                     }
-                }
-                
-                // Evidenzia l'ultima mossa navigata
-                if (index >= 0 && moveHistory[index]) {
-                    applyHighlightToMove(moveHistory[index].from, moveHistory[index].to);
-                }
-            } else {
-                // Se torniamo all'inizio, rimuovi tutte le evidenziazioni
-                setSquareStyles({});
-            }
 
-            setPosition(gameRef.current.fen());
-            setCurrentIndex(index);
-            setSelectedSquare(null);
-        } catch (error) {
-            console.error('Errore nella navigazione:', error);
-        }
-    }, [moveHistory, applyHighlightToMove]);
+                    // Evidenzia l'ultima mossa navigata
+                    if (index >= 0 && moveHistory[index]) {
+                        applyHighlightToMove(moveHistory[index].from, moveHistory[index].to);
+                    }
+                } else {
+                    // Se torniamo all'inizio, rimuovi tutte le evidenziazioni
+                    setSquareStyles({});
+                }
+
+                setPosition(gameRef.current.fen());
+                setCurrentIndex(index);
+                setSelectedSquare(null);
+            } catch (error) {
+                console.error('Errore nella navigazione:', error);
+            }
+        },
+        [moveHistory, applyHighlightToMove]
+    );
 
     // FUNZIONI DI NAVIGAZIONE
     const goToStart = useCallback(() => {
@@ -329,12 +339,22 @@ const ChessboardPopup = ({
                 setShowChildSelector(true);
             }
         }
-    }, [currentIndex, moveHistory, selectedNodeId, internalCanvasData, navigateToMove, navigateToNode]);
+    }, [
+        currentIndex,
+        moveHistory,
+        selectedNodeId,
+        internalCanvasData,
+        navigateToMove,
+        navigateToNode,
+    ]);
 
-    const handleChildSelect = useCallback((nodeId) => {
-        setShowChildSelector(false);
-        navigateToNode(nodeId);
-    }, [navigateToNode]);
+    const handleChildSelect = useCallback(
+        (nodeId) => {
+            setShowChildSelector(false);
+            navigateToNode(nodeId);
+        },
+        [navigateToNode]
+    );
 
     const goToEnd = useCallback(() => {
         navigateToMove(moveHistory.length - 1);
@@ -347,82 +367,88 @@ const ChessboardPopup = ({
     }, [initialNodeId, navigateToNode]);
 
     // NUOVA FUNZIONE: Gestisce il click sulle caselle della scacchiera
-    const onSquareClick = useCallback((square) => {
-        // Se siamo all'ultima mossa della storia, consenti interazione
-        const isAtLatestMove = currentIndex === moveHistory.length - 1;
-        if (!isAtLatestMove) return;
+    const onSquareClick = useCallback(
+        (square) => {
+            // Se siamo all'ultima mossa della storia, consenti interazione
+            const isAtLatestMove = currentIndex === moveHistory.length - 1;
+            if (!isAtLatestMove) return;
 
-        // Caso 1: Clicco sulla casella già selezionata (deseleziona)
-        if (selectedSquare === square) {
-            setSelectedSquare(null);
-            // Se c'è una mossa precedente, la reevidenziamo
-            if (moveHistory.length > 0 && currentIndex >= 0) {
-                const lastHistoryMove = moveHistory[currentIndex];
-                applyHighlightToMove(lastHistoryMove.from, lastHistoryMove.to);
-            } else {
-                setSquareStyles({});
-            }
-            return;
-        }
-        
-        // Caso 2: C'è già una casella selezionata
-        if (selectedSquare) {
-            // Ottieni il pezzo nella casella di destinazione
-            const targetPiece = gameRef.current.get(square);
-            
-            // Se è un pezzo dello stesso colore, cambia selezione
-            const turn = gameRef.current.turn();
-            if (targetPiece && targetPiece.color === turn) {
-                setSelectedSquare(square);
-                setSquareStyles(showLegalMoves(square));
-                return;
-            }
-            
-            // Prova a fare la mossa
-            const tempGame = new Chess(gameRef.current.fen());
-            const isLegalMove = tempGame.move({
-                from: selectedSquare,
-                to: square,
-                promotion: 'q',
-            });
-            
-            if (isLegalMove) {
-                // Se è una mossa valida, la eseguiamo
-                handlePieceDrop(selectedSquare, square);
-            } else {
-                // Se non è valida, deseleziona e mostra l'ultima mossa
+            // Caso 1: Clicco sulla casella già selezionata (deseleziona)
+            if (selectedSquare === square) {
                 setSelectedSquare(null);
+                // Se c'è una mossa precedente, la reevidenziamo
                 if (moveHistory.length > 0 && currentIndex >= 0) {
                     const lastHistoryMove = moveHistory[currentIndex];
                     applyHighlightToMove(lastHistoryMove.from, lastHistoryMove.to);
                 } else {
                     setSquareStyles({});
                 }
+                return;
             }
-        } else {
-            // Caso 3: Nuova selezione
-            const piece = gameRef.current.get(square);
-            const turn = gameRef.current.turn();
-            if (piece && piece.color === turn) {
-                setSelectedSquare(square);
-                setSquareStyles(showLegalMoves(square));
+
+            // Caso 2: C'è già una casella selezionata
+            if (selectedSquare) {
+                // Ottieni il pezzo nella casella di destinazione
+                const targetPiece = gameRef.current.get(square);
+
+                // Se è un pezzo dello stesso colore, cambia selezione
+                const turn = gameRef.current.turn();
+                if (targetPiece && targetPiece.color === turn) {
+                    setSelectedSquare(square);
+                    setSquareStyles(showLegalMoves(square));
+                    return;
+                }
+
+                // Prova a fare la mossa
+                const tempGame = new Chess(gameRef.current.fen());
+                const isLegalMove = tempGame.move({
+                    from: selectedSquare,
+                    to: square,
+                    promotion: 'q',
+                });
+
+                if (isLegalMove) {
+                    // Se è una mossa valida, la eseguiamo
+                    handlePieceDrop(selectedSquare, square);
+                } else {
+                    // Se non è valida, deseleziona e mostra l'ultima mossa
+                    setSelectedSquare(null);
+                    if (moveHistory.length > 0 && currentIndex >= 0) {
+                        const lastHistoryMove = moveHistory[currentIndex];
+                        applyHighlightToMove(lastHistoryMove.from, lastHistoryMove.to);
+                    } else {
+                        setSquareStyles({});
+                    }
+                }
+            } else {
+                // Caso 3: Nuova selezione
+                const piece = gameRef.current.get(square);
+                const turn = gameRef.current.turn();
+                if (piece && piece.color === turn) {
+                    setSelectedSquare(square);
+                    setSquareStyles(showLegalMoves(square));
+                }
             }
-        }
-    }, [selectedSquare, moveHistory, currentIndex, showLegalMoves, applyHighlightToMove]);
+        },
+        [selectedSquare, moveHistory, currentIndex, showLegalMoves, applyHighlightToMove]
+    );
 
     // NUOVE FUNZIONI: Gestione del trascinamento dei pezzi
-    const onPieceDragBegin = useCallback((piece, sourceSquare) => {
-        // Verifica che si stia interagendo con la posizione attuale
-        const isAtLatestMove = currentIndex === moveHistory.length - 1;
-        if (!isAtLatestMove) return;
-        
-        const turn = gameRef.current.turn();
-        if (piece[0] === turn) {
-            setIsDragging(true);
-            setSelectedSquare(sourceSquare);
-            setSquareStyles(showLegalMoves(sourceSquare));
-        }
-    }, [currentIndex, moveHistory.length, showLegalMoves]);
+    const onPieceDragBegin = useCallback(
+        (piece, sourceSquare) => {
+            // Verifica che si stia interagendo con la posizione attuale
+            const isAtLatestMove = currentIndex === moveHistory.length - 1;
+            if (!isAtLatestMove) return;
+
+            const turn = gameRef.current.turn();
+            if (piece[0] === turn) {
+                setIsDragging(true);
+                setSelectedSquare(sourceSquare);
+                setSquareStyles(showLegalMoves(sourceSquare));
+            }
+        },
+        [currentIndex, moveHistory.length, showLegalMoves]
+    );
 
     const onPieceDragEnd = useCallback(() => {
         setIsDragging(false);
@@ -430,108 +456,120 @@ const ChessboardPopup = ({
     }, []);
 
     // Aggiorna handlePieceDrop per includere l'highlighting
-    const handlePieceDrop = useCallback((sourceSquare, targetSquare) => {
-        // Verifica che siamo all'ultima mossa della storia
-        const isAtLatestMove = currentIndex === moveHistory.length - 1;
-        if (!isAtLatestMove) return false;
+    const handlePieceDrop = useCallback(
+        (sourceSquare, targetSquare) => {
+            // Verifica che siamo all'ultima mossa della storia
+            const isAtLatestMove = currentIndex === moveHistory.length - 1;
+            if (!isAtLatestMove) return false;
 
-        try {
-            const moveObj = { from: sourceSquare, to: targetSquare, promotion: 'q' };
-            const result = gameRef.current.move(moveObj);
+            try {
+                const moveObj = { from: sourceSquare, to: targetSquare, promotion: 'q' };
+                const result = gameRef.current.move(moveObj);
 
-            if (!result) {
-                // Se la mossa non è valida, pulisci la selezione e mostra l'ultima mossa evidenziata
-                setSelectedSquare(null);
-                if (moveHistory.length > 0 && currentIndex >= 0) {
-                    const lastMove = moveHistory[currentIndex];
-                    applyHighlightToMove(lastMove.from, lastMove.to);
+                if (!result) {
+                    // Se la mossa non è valida, pulisci la selezione e mostra l'ultima mossa evidenziata
+                    setSelectedSquare(null);
+                    if (moveHistory.length > 0 && currentIndex >= 0) {
+                        const lastMove = moveHistory[currentIndex];
+                        applyHighlightToMove(lastMove.from, lastMove.to);
+                    }
+                    return false;
                 }
+
+                setPosition(gameRef.current.fen());
+
+                // Evidenzia immediatamente la mossa eseguita
+                applyHighlightToMove(sourceSquare, targetSquare);
+                setSelectedSquare(null);
+
+                // Aggiorna la storia delle mosse
+                const newHistory = [...moveHistory.slice(0, currentIndex + 1), result];
+                setMoveHistory(newHistory);
+                setCurrentIndex(currentIndex + 1);
+
+                // Gestione nodi - parte esistente
+                if (!internalCanvasData || !selectedNodeId) {
+                    return true;
+                }
+
+                const childConnections = internalCanvasData.connections.filter(
+                    (conn) => conn.fromId === selectedNodeId
+                );
+
+                const childNodeIds = childConnections.map((conn) => conn.toId);
+
+                let matchingNodeId = null;
+
+                for (const childId of childNodeIds) {
+                    const childNode = internalCanvasData.nodes.find((node) => node.id === childId);
+                    if (childNode && childNode.label === result.san) {
+                        matchingNodeId = childId;
+                    }
+                }
+
+                if (matchingNodeId) {
+                    safeSelectNode(matchingNodeId);
+                    return true;
+                }
+
+                const updatedCanvas = createNodeWithOptimalPosition(
+                    internalCanvasData,
+                    selectedNodeId,
+                    {
+                        label: result.san,
+                        type: 'move',
+                        description: '',
+                        pgn: gameRef.current.pgn(),
+                    }
+                );
+
+                const newNodeId = updatedCanvas.nodes[updatedCanvas.nodes.length - 1]?.id;
+
+                if (onUpdateCanvasAndSelectNode) {
+                    onUpdateCanvasAndSelectNode(updatedCanvas, newNodeId);
+                } else {
+                    safeUpdateCanvas(updatedCanvas);
+                    safeSelectNode(newNodeId);
+                }
+
+                return true;
+            } catch (error) {
+                console.error("Errore nell'esecuzione della mossa:", error);
                 return false;
             }
-
-            setPosition(gameRef.current.fen());
-
-            // Evidenzia immediatamente la mossa eseguita
-            applyHighlightToMove(sourceSquare, targetSquare);
-            setSelectedSquare(null);
-
-            // Aggiorna la storia delle mosse
-            const newHistory = [...moveHistory.slice(0, currentIndex + 1), result];
-            setMoveHistory(newHistory);
-            setCurrentIndex(currentIndex + 1);
-
-            // Gestione nodi - parte esistente
-            if (!internalCanvasData || !selectedNodeId) {
-                return true;
-            }
-
-            const childConnections = internalCanvasData.connections.filter(
-                (conn) => conn.fromId === selectedNodeId
-            );
-
-            const childNodeIds = childConnections.map((conn) => conn.toId);
-
-            let matchingNodeId = null;
-
-            for (const childId of childNodeIds) {
-                const childNode = internalCanvasData.nodes.find((node) => node.id === childId);
-                if (childNode && childNode.label === result.san) {
-                    matchingNodeId = childId;
-                }
-            }
-
-            if (matchingNodeId) {
-                safeSelectNode(matchingNodeId);
-                return true;
-            }
-
-            const updatedCanvas = createNodeWithOptimalPosition(
-                internalCanvasData,
-                selectedNodeId,
-                {
-                    label: result.san,
-                    type: 'move',
-                    description: '',
-                    pgn: gameRef.current.pgn(),
-                }
-            );
-
-            const newNodeId = updatedCanvas.nodes[updatedCanvas.nodes.length - 1]?.id;
-
-            if (onUpdateCanvasAndSelectNode) {
-                onUpdateCanvasAndSelectNode(updatedCanvas, newNodeId);
-            } else {
-                safeUpdateCanvas(updatedCanvas);
-                safeSelectNode(newNodeId);
-            }
-
-            return true;
-        } catch (error) {
-            console.error("Errore nell'esecuzione della mossa:", error);
-            return false;
-        }
-    }, [currentIndex, moveHistory, internalCanvasData, selectedNodeId, safeSelectNode, safeUpdateCanvas, onUpdateCanvasAndSelectNode, applyHighlightToMove]);
+        },
+        [
+            currentIndex,
+            moveHistory,
+            internalCanvasData,
+            selectedNodeId,
+            safeSelectNode,
+            safeUpdateCanvas,
+            onUpdateCanvasAndSelectNode,
+            applyHighlightToMove,
+        ]
+    );
 
     // Gestisce il salvataggio delle note con sincronizzazione migliorata
     const saveNote = useCallback(() => {
         if (!selectedNodeId || !internalCanvasData) return;
-        
+
         // Se la nota è invariata, non fare nulla
         if (currentNote === lastSavedNoteRef.current) return;
 
         try {
             // Aggiorna il riferimento della nota salvata
             lastSavedNoteRef.current = currentNote;
-            
+
             // Crea una copia profonda dell'oggetto canvas
             const updatedCanvas = JSON.parse(JSON.stringify(internalCanvasData));
-            
+
             // Aggiorna la descrizione del nodo selezionato
-            const nodeIndex = updatedCanvas.nodes.findIndex(node => node.id === selectedNodeId);
+            const nodeIndex = updatedCanvas.nodes.findIndex((node) => node.id === selectedNodeId);
             if (nodeIndex !== -1) {
                 updatedCanvas.nodes[nodeIndex].description = currentNote;
             }
-            
+
             // Aggiorna immediatamente il canvas
             safeUpdateCanvas(updatedCanvas);
         } catch (error) {
@@ -545,28 +583,34 @@ const ChessboardPopup = ({
     }, []);
 
     // Gestisce gli eventi dei tasti nella textarea
-    const handleNoteKeyDown = useCallback((e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault(); // Impedisce l'inserimento dell'a capo
-            saveNote();
-            e.target.blur(); // Deseleziona il campo di testo
-        }
-    }, [saveNote]);
+    const handleNoteKeyDown = useCallback(
+        (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Impedisce l'inserimento dell'a capo
+                saveNote();
+                e.target.blur(); // Deseleziona il campo di testo
+            }
+        },
+        [saveNote]
+    );
 
     const formatMoveNotation = useCallback((move, index) => {
         const moveNumber = Math.floor(index / 2) + 1;
         return index % 2 === 0 ? `${moveNumber}. ${move.san}` : move.san;
     }, []);
 
-    const handleSafeClose = useCallback((e) => {
-        e.stopPropagation();
-        if (isUpdatingRef.current) {
-            return;
-        }
-        // Assicuriamoci che le modifiche siano salvate prima di chiudere
-        saveNote();
-        onClose();
-    }, [onClose, saveNote]);
+    const handleSafeClose = useCallback(
+        (e) => {
+            e.stopPropagation();
+            if (isUpdatingRef.current) {
+                return;
+            }
+            // Assicuriamoci che le modifiche siano salvate prima di chiudere
+            saveNote();
+            onClose();
+        },
+        [onClose, saveNote]
+    );
 
     const hasNextMoves = useCallback(() => {
         if (currentIndex < moveHistory.length - 1) {
@@ -592,125 +636,249 @@ const ChessboardPopup = ({
     const toggleStockfish = useCallback(() => {
         setStockfishEnabled((prev) => !prev);
     }, []);
-    
+    const handleOpeningMoveSelect = useCallback(
+        (moveSan) => {
+            try {
+                // Verifica che siamo all'ultima mossa della storia
+                const isAtLatestMove = currentIndex === moveHistory.length - 1;
+                if (!isAtLatestMove) return;
+
+                // Crea una nuova posizione basata sulla mossa
+                const gameCopy = new Chess(position);
+                const result = gameCopy.move(moveSan);
+
+                if (!result) return;
+
+                // Imposta la nuova posizione
+                setPosition(gameCopy.fen());
+
+                // Evidenzia la mossa appena eseguita
+                // Cerca le caselle di partenza e arrivo
+                const moves = gameRef.current.moves({ verbose: true });
+                const moveInfo = moves.find((m) => m.san === moveSan);
+                if (moveInfo) {
+                    applyHighlightToMove(moveInfo.from, moveInfo.to);
+                }
+
+                setSelectedSquare(null);
+
+                // Aggiorna la storia delle mosse
+                const newHistory = [...moveHistory.slice(0, currentIndex + 1), result];
+                setMoveHistory(newHistory);
+                setCurrentIndex(currentIndex + 1);
+
+                // Aggiorna anche l'oggetto gameRef
+                gameRef.current.move(moveSan);
+
+                // === INIZIO LOGICA DI CREAZIONE NODI - Copiata da handlePieceDrop ===
+                if (!internalCanvasData || !selectedNodeId) {
+                    return;
+                }
+
+                const childConnections = internalCanvasData.connections.filter(
+                    (conn) => conn.fromId === selectedNodeId
+                );
+
+                const childNodeIds = childConnections.map((conn) => conn.toId);
+
+                let matchingNodeId = null;
+
+                for (const childId of childNodeIds) {
+                    const childNode = internalCanvasData.nodes.find((node) => node.id === childId);
+                    if (childNode && childNode.label === result.san) {
+                        matchingNodeId = childId;
+                    }
+                }
+
+                if (matchingNodeId) {
+                    safeSelectNode(matchingNodeId);
+                    return;
+                }
+
+                const updatedCanvas = createNodeWithOptimalPosition(
+                    internalCanvasData,
+                    selectedNodeId,
+                    {
+                        label: result.san,
+                        type: 'move',
+                        description: '',
+                        pgn: gameRef.current.pgn(),
+                    }
+                );
+
+                const newNodeId = updatedCanvas.nodes[updatedCanvas.nodes.length - 1]?.id;
+
+                if (onUpdateCanvasAndSelectNode) {
+                    onUpdateCanvasAndSelectNode(updatedCanvas, newNodeId);
+                } else {
+                    safeUpdateCanvas(updatedCanvas);
+                    safeSelectNode(newNodeId);
+                }
+                // === FINE LOGICA DI CREAZIONE NODI ===
+            } catch (error) {
+                console.error("Errore nell'eseguire la mossa:", error);
+            }
+        },
+        [
+            position,
+            moveHistory,
+            currentIndex,
+            selectedNodeId,
+            internalCanvasData,
+            safeSelectNode,
+            safeUpdateCanvas,
+            onUpdateCanvasAndSelectNode,
+            applyHighlightToMove,
+        ]
+    );
+    useEffect(() => {
+        const updateBoardSize = () => {
+            if (boardContainerRef.current) {
+                const containerWidth = boardContainerRef.current.clientWidth;
+                const containerHeight = boardContainerRef.current.clientHeight;
+
+                // Calcola la dimensione massima che può entrare nel contenitore
+                // considerando anche lo spazio per i controlli (pulsanti sotto la scacchiera)
+                const maxHeight = containerHeight - 100; // 100px per controlli e margini
+                const maxWidth = containerWidth - 40; // 40px per margini laterali
+
+                // Usa il valore più piccolo tra larghezza e altezza per mantenere un quadrato
+                const optimalSize = Math.min(maxWidth, maxHeight);
+
+                // Assicurati che la dimensione sia almeno 280px (per schermi molto piccoli)
+                // e non superiore a 800px (per schermi molto grandi)
+                setBoardSize(Math.max(280, Math.min(optimalSize, 800)));
+            }
+        };
+
+        // Aggiorna immediatamente la dimensione
+        updateBoardSize();
+
+        // Crea un ResizeObserver per rilevare cambiamenti nel contenitore
+        const resizeObserver = new ResizeObserver(updateBoardSize);
+        if (boardContainerRef.current) {
+            resizeObserver.observe(boardContainerRef.current);
+        }
+
+        // Aggiungi listener di resize per la finestra intera
+        window.addEventListener('resize', updateBoardSize);
+
+        return () => {
+            // Rimuovi gli event listener e l'observer quando il componente viene smontato
+            window.removeEventListener('resize', updateBoardSize);
+            resizeObserver.disconnect();
+        };
+    }, []);
+
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm"
             onClick={onClose}
         >
             <div
-                className="bg-gray-800 rounded-lg shadow-xl w-[96%] max-w-6xl max-h-[90vh] flex flex-col overflow-hidden"
+                className="bg-gray-800 rounded-lg shadow-xl w-[96%] max-w-6xl h-[95vh] flex flex-col overflow-hidden relative"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="flex justify-between items-center p-3 bg-gray-900 border-b border-gray-700">
-                    <h2 className="text-lg font-bold text-white">Scacchiera</h2>
-                    <div className="flex items-center gap-3">
-                        {/* Toggle mobile per mostrare/nascondere pannello info con icona dinamica */}
-                        <button
-                            onClick={toggleMobilePanel}
-                            className="md:hidden p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700"
-                            aria-label={showMobilePanel ? 'Nascondi dettagli' : 'Mostra dettagli'}
-                        >
-                            <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                {showMobilePanel ? (
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M20 12H4"
-                                    />
-                                ) : (
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M12 4v16m8-8H4"
-                                    />
-                                )}
-                            </svg>
-                        </button>
+                {/* Pulsante di chiusura posizionato in modo assoluto */}
+                <button
+                    onClick={handleSafeClose}
+                    className="absolute top-3 right-3 z-10 p-2 rounded-full bg-gray-800 bg-opacity-80 text-gray-300 hover:text-white hover:bg-gray-700 shadow-md"
+                    aria-label="Chiudi"
+                >
+                    <svg className="w-6 h-6" viewBox="0 0 20 20" fill="currentColor">
+                        <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                        />
+                    </svg>
+                </button>
 
-                        {/* Pulsante per tornare al nodo iniziale */}
-                        {initialNodeId && initialNodeId !== selectedNodeId && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    goToInitialNode();
-                                }}
-                                className="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-sm"
-                            >
-                                <span className="hidden sm:inline">Posizione iniziale</span>
-                                <span className="sm:hidden">Inizio</span>
-                            </button>
+                {/* Pulsante per toggle mobile (solo su mobile) */}
+                <button
+                    onClick={toggleMobilePanel}
+                    className="md:hidden absolute top-3 left-3 z-10 p-2 rounded-full bg-gray-800 bg-opacity-80 text-gray-300 hover:text-white hover:bg-gray-700 shadow-md"
+                    aria-label={showMobilePanel ? 'Nascondi dettagli' : 'Mostra dettagli'}
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        {showMobilePanel ? (
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M20 12H4"
+                            />
+                        ) : (
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 4v16m8-8H4"
+                            />
                         )}
+                    </svg>
+                </button>
 
-                        {/* Pulsante chiusura */}
-                        <button
-                            onClick={handleSafeClose}
-                            className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700"
-                            aria-label="Chiudi"
-                        >
-                            <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path
-                                    fillRule="evenodd"
-                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
+                {/* Pulsante per tornare al nodo iniziale (quando necessario) */}
 
                 {/* Contenuto principale */}
                 <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-                    {/* Container scacchiera - parte sinistra */}
+                    {/* Container scacchiera - parte sinistra con padding ridotto */}
                     <div
                         ref={boardContainerRef}
-                        className="md:w-2/3 p-4 flex flex-col items-center overflow-y-auto"
+                        className="md:w-2/3 p-2 flex flex-col items-center justify-center flex-1 overflow-hidden"
                     >
-                        {/* Scacchiera con dimensione fissa */}
-                        <div
-                            style={{
-                                width: `${boardSize}px`,
-                                height: `${boardSize}px`,
-                                maxWidth: '100%',
-                                borderRadius: '10px',
-                                overflow: 'hidden',
-                                userSelect: 'none',
-                                WebkitUserSelect: 'none',
-                            }}
-                        >
-                            <Chessboard
-                                id="responsive-board"
-                                position={position}
-                                boardWidth={boardSize}
-                                areArrowsAllowed={true}
-                                customDarkSquareStyle={{ backgroundColor: '#ad7456' }}
-                                customLightSquareStyle={{ backgroundColor: '#ead8c0' }}
-                                onPieceDrop={handlePieceDrop}
-                                customPieces={customPieces}
-                                customSquareStyles={squareStyles}
-                                onSquareClick={onSquareClick}
-                                onPieceDragBegin={onPieceDragBegin}
-                                onPieceDragEnd={onPieceDragEnd}
-                            />
+                        {/* Container per scacchiera + barra di valutazione */}
+                        <div className="flex items-start" style={{ marginTop: '20px' }}>
+                            {/* Barra di valutazione - visibile solo se l'engine è attivo */}
+                            {stockfishEnabled && (
+                                <EvalBar
+                                    evaluation={currentEvaluation}
+                                    height={boardSize}
+                                    isFlipped={boardOrientation === 'black'}
+                                />
+                            )}
+
+                            {/* Scacchiera con contenitore che si adatta in base al contenuto */}
+                            <div
+                                style={{
+                                    width: `${boardSize}px`,
+                                    height: `${boardSize}px`,
+                                    maxWidth: '100%',
+                                    borderRadius: '10px',
+                                    overflow: 'hidden',
+                                    userSelect: 'none',
+                                    WebkitUserSelect: 'none',
+                                }}
+                                className="mb-4"
+                            >
+                                <Chessboard
+                                    id="responsive-board"
+                                    position={position}
+                                    boardWidth={boardSize}
+                                    areArrowsAllowed={true}
+                                    customDarkSquareStyle={{ backgroundColor: '#ad7456' }}
+                                    customLightSquareStyle={{ backgroundColor: '#ead8c0' }}
+                                    onPieceDrop={handlePieceDrop}
+                                    customPieces={customPieces}
+                                    customSquareStyles={squareStyles}
+                                    onSquareClick={onSquareClick}
+                                    onPieceDragBegin={onPieceDragBegin}
+                                    onPieceDragEnd={onPieceDragEnd}
+                                    boardOrientation={boardOrientation}
+                                />
+                            </div>
                         </div>
 
                         {/* Controlli navigazione */}
-                        <div className="flex justify-center space-x-4 mt-4 w-full">
+                        <div className="flex justify-center space-x-2 mt-4 w-full">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     goToStart();
                                 }}
                                 className="bg-indigo-700 hover:bg-indigo-600 text-white p-2 rounded"
-                                title="Posizione iniziale"
+                                title="Inizio sequenza"
                             >
                                 <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                                     <path
@@ -778,6 +946,29 @@ const ChessboardPopup = ({
                                     />
                                 </svg>
                             </button>
+
+                            {initialNodeId && initialNodeId !== selectedNodeId && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        goToInitialNode();
+                                    }}
+                                    className="bg-green-600 hover:bg-green-500 text-white p-2 rounded ml-2"
+                                    title="Torna alla posizione iniziale dell'albero"
+                                >
+                                    <svg
+                                        className="w-5 h-5"
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm.707-10.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L9.414 11H13a1 1 0 100-2H9.414l1.293-1.293z"
+                                            clipRule="evenodd"
+                                        />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
 
                         {/* Note - SOLO PER MOBILE */}
@@ -803,18 +994,20 @@ const ChessboardPopup = ({
                         >
                             <div className="border-t border-gray-700 pt-3">
                                 <div className="mt-3">
-                                <h4 className="text-sm font-medium text-gray-300 mb-1">Turno</h4>
-                                <div className="flex items-center">
-                                    <div
-                                        className={`w-3 h-3 rounded-full mr-2 ${
-                                            position.includes(' w ') ? 'bg-white' : 'bg-black'
-                                        }`}
-                                    ></div>
-                                    <span className="text-gray-300">
-                                        {position.includes(' w ') ? 'Bianco' : 'Nero'}
-                                    </span>
+                                    <h4 className="text-sm font-medium text-gray-300 mb-1">
+                                        Turno
+                                    </h4>
+                                    <div className="flex items-center">
+                                        <div
+                                            className={`w-3 h-3 rounded-full mr-2 ${
+                                                position.includes(' w ') ? 'bg-white' : 'bg-black'
+                                            }`}
+                                        ></div>
+                                        <span className="text-gray-300">
+                                            {position.includes(' w ') ? 'Bianco' : 'Nero'}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
                                 {/* Lista mosse mobile - ALTEZZA AUMENTATA */}
                                 <h3 className="text-base font-medium text-white mb-2">
                                     Storico Mosse
@@ -850,19 +1043,18 @@ const ChessboardPopup = ({
                     {/* Pannello laterale - visibile su desktop, nascosto su mobile */}
                     <div className="hidden md:block md:w-1/3 border-l border-gray-700 bg-gray-800 p-4 overflow-y-auto">
                         <div className=" mb-2 ">
-                                
-                                <div className="flex items-center">
-                                    <div
-                                        className={`w-3 h-3 rounded-full mr-2 ${
-                                            position.includes(' w ') ? 'bg-white' : 'bg-black'
-                                        }`}
-                                    ></div>
-                                    <span className="text-gray-300">
-                                        {position.includes(' w ') ? 'Muove il Bianco' : 'Muove il Nero'}
-                                    </span>
-                                </div>
+                            <div className="flex items-center">
+                                <div
+                                    className={`w-3 h-3 rounded-full mr-2 ${
+                                        position.includes(' w ') ? 'bg-white' : 'bg-black'
+                                    }`}
+                                ></div>
+                                <span className="text-gray-300">
+                                    {position.includes(' w ') ? 'Muove il Bianco' : 'Muove il Nero'}
+                                </span>
                             </div>
-                        <h3 className="text-lg font-medium text-white mb-3">Storico Mosse</h3>
+                        </div>
+
                         <div className="bg-gray-900 rounded-md p-3 max-h-60 overflow-y-auto">
                             {moveHistory.length > 0 ? (
                                 <div className="grid grid-cols-2 gap-2">
@@ -930,11 +1122,17 @@ const ChessboardPopup = ({
                                 </div>
                             </button>
 
-                            {stockfishEnabled && <StockfishComponent fen={position} />}
+                            {stockfishEnabled && (
+                                <StockfishComponent
+                                    fen={position}
+                                    onEvaluationChange={setCurrentEvaluation}
+                                />
+                            )}
                         </div>
+                        <OpeningExplorer fen={position} onMoveSelect={handleOpeningMoveSelect} />
 
                         {/* Note desktop - sempre modificabili */}
-                        <div className="mt-4 bg-gray-700 rounded-md p-3">
+                        <div className="mt-5 bg-gray-700 rounded-md p-3 ">
                             <h3 className="text-sm font-medium text-gray-300 mb-2">
                                 Note sulla posizione
                             </h3>
@@ -956,7 +1154,6 @@ const ChessboardPopup = ({
                             <div className="bg-gray-900 p-2 rounded-md text-xs text-gray-400 overflow-x-auto break-all">
                                 {position}
                             </div>
-
                         </div>
                     </div>
                 </div>
