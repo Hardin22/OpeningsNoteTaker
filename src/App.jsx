@@ -5,7 +5,7 @@ import DrillMode from './components/DrillMode';
 import Sidebar from './components/Sidebar';
 import { generatePGN } from './utils/chessLogic';
 import { useAuth } from './components/AuthContext';
-import { databaseSaver } from './utils/databaseSaver';
+import { databaseSaver } from './utils/DatabaseSaver';
 
 
 function App() {
