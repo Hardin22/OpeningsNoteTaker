@@ -35,14 +35,16 @@ const Canvas = ({
     const [initialZoom, setInitialZoom] = useState(1);
 
     // All'avvio carichiamo i dati salvati da localStorage
+    {/*
     useEffect(() => {
         const savedData = localStorage.getItem('canvasData');
         if (savedData) {
             setCanvasData(JSON.parse(savedData));
         }
-    }, [setCanvasData]);
+    }, [setCanvasData]);*/}
 
     // Auto-salvataggio ogni 15 secondi su localStorage
+    {/*
     useEffect(() => {
         const interval = setInterval(() => {
             const leafNodes = canvasData.nodes.filter(
@@ -51,14 +53,16 @@ const Canvas = ({
             const fullLines = leafNodes
                 .map((node) => node.pgn)
                 .filter((pgn) => pgn && pgn.trim() !== '');
-            const dataToSave = {
+            {
+                /*const dataToSave = {
                 ...canvasData,
                 fullLines: fullLines,
             };
             localStorage.setItem('canvasData', JSON.stringify(dataToSave));
+            }
         }, 15000);
         return () => clearInterval(interval);
-    }, [canvasData]);
+    }, [canvasData]); */}
 
     // Esporta i dati del canvas come file JSON
     const exportCanvasToFile = useCallback(() => {

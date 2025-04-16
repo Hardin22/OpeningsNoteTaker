@@ -11,7 +11,7 @@ const parsePGN = (pgn) => {
     return tokens.filter((token) => !/^\d+\.$/.test(token));
 };
 
-const DrillMode = ({ onClose }) => {
+const DrillMode = ({ fullLines = [], onClose }) => {
     // Stati esistenti
     const [playerColor, setPlayerColor] = useState(null);
     const [showColorSelection, setShowColorSelection] = useState(true);
@@ -148,19 +148,16 @@ const DrillMode = ({ onClose }) => {
     const lastUsedPgnRef = useRef(null);
     const initializeDrill = useCallback(
         (useSameLine = false) => {
-            const storedData = JSON.parse(localStorage.getItem('canvasData'));
             let chosenPGN;
 
             if (useSameLine && lastUsedPgnRef.current) {
                 // Se vogliamo rigiocare la stessa linea
                 chosenPGN = lastUsedPgnRef.current;
             } else {
-                // Altrimenti prendi una linea a caso (logica esistente)
+                // Usa le fullLines passate come prop invece di accedere a localStorage
                 chosenPGN =
-                    storedData?.fullLines?.length > 0
-                        ? storedData.fullLines[
-                              Math.floor(Math.random() * storedData.fullLines.length)
-                          ]
+                    fullLines.length > 0
+                        ? fullLines[Math.floor(Math.random() * fullLines.length)]
                         : hardcodedPGN;
                 lastUsedPgnRef.current = chosenPGN;
             }
@@ -266,9 +263,6 @@ const DrillMode = ({ onClose }) => {
             return false;
         }
     };
- 
-
-    
 
     const applyHighlightToMove = (from, to) => {
         setSquareStyles({
@@ -366,7 +360,6 @@ const DrillMode = ({ onClose }) => {
         [selectedSquare, playerColor, gameOver, moveHistory, showLegalMoves, handlePieceDrop]
     );
 
-        
     const isDraggablePiece = ({ piece }) => !gameOver && piece.charAt(0) === playerColor;
 
     const onPieceDragBegin = useCallback(
@@ -385,8 +378,10 @@ const DrillMode = ({ onClose }) => {
     }, []);
     if (showColorSelection) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm"
-            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
+            <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm"
+                style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+            >
                 <div className="bg-gray-800 rounded-lg shadow-2xl overflow-hidden max-w-5xl w-full mx-4">
                     <div className="flex justify-between items-center p-4 border-b border-gray-700">
                         <h2 className="text-xl font-semibold text-white">Allenamento (Drill)</h2>
@@ -584,7 +579,6 @@ const DrillMode = ({ onClose }) => {
                                 customSquareStyles={squareStyles}
                                 onSquareClick={onSquareClick}
                                 onPieceDragBegin={onPieceDragBegin}
-                                
                                 onPieceDragEnd={onPieceDragEnd}
                             />
                         </div>
@@ -812,7 +806,10 @@ const DrillMode = ({ onClose }) => {
 };
 
 DrillMode.propTypes = {
+    fullLines: PropTypes.arrayOf(PropTypes.string),
     onClose: PropTypes.func.isRequired,
 };
-
+DrillMode.defaultProps = {
+    fullLines: [],
+};
 export default DrillMode;

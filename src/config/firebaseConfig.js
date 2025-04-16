@@ -1,7 +1,8 @@
 // Import the functions you need from the SDKs you need
-import { initializeApp } from 'firebase/app';
 import { getAnalytics } from 'firebase/analytics';
+import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -9,7 +10,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
     apiKey: 'AIzaSyBDdAvwL6tHB3BKYbY9rb2GsTH8yIQZtvg',
-    authDomain: 'chessnotes-a9726.firebaseapp.com' ,
+    authDomain: 'chessnotes-a9726.firebaseapp.com',
     projectId: 'chessnotes-a9726',
     storageBucket: 'chessnotes-a9726.firebasestorage.app',
     messagingSenderId: '881905560245',
@@ -25,5 +26,8 @@ const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Esporta auth e il provider, così da poterli importare in altri componenti
-export { auth, googleProvider };
+// Inizializza Firestore
+const db = getFirestore(app);
+
+// Esporta auth, il provider e db
+export { auth, db, googleProvider };

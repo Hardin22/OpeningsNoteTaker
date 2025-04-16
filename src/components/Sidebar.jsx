@@ -2,16 +2,23 @@ import React, { useRef, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import Tutorial from './Tutorial';
 import ImportPgnModal from './ImportPgnModal';
+import Library from './Library';
+
+// Nel componente Sidebar, aggiungere la Library
 const Sidebar = ({
     onAddNode,
     onAddAnnotation,
     selectedNode,
     updateNode,
+    canvasData,
     currentPGN,
     onOpenChessboard,
     onStartDrillMode,
     setCanvasData,
     onDeleteNode,
+    onSaveRepertoire,
+    isSaving,
+    lastSaved,
 }) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const fileInputRef = useRef(null);
@@ -19,6 +26,32 @@ const Sidebar = ({
     const [viewportHeight, setViewportHeight] = useState(window.innerHeight);
     const [isTutorialOpen, setIsTutorialOpen] = useState(false);
     const [isImportPgnOpen, setIsImportPgnOpen] = useState(false);
+const [activeRepertoireId, setActiveRepertoireId] = useState(null);
+
+    const handleCreateNewOpening = (emptyCanvas) => {
+        // Carica un nuovo canvas vuoto
+        setCanvasData(emptyCanvas);
+
+        // Salva in localStorage
+        //localStorage.setItem('canvasData', JSON.stringify(emptyCanvas));
+
+        // Feedback
+        console.log('Nuova apertura creata');
+    };
+
+    const handleLoadRepertoire = (canvasData, title) => {
+        if (canvasData) {
+            // Aggiorna il canvas con i dati
+            setCanvasData(canvasData);
+
+            // Salva in localStorage (come fa l'import da file)
+            //localStorage.setItem('canvasData', JSON.stringify(canvasData));
+
+            // Feedback all'utente
+            console.log(`Repertorio "${title}" caricato con successo`);
+            alert(`Apertura "${title}" caricata con successo!`);
+        }
+    };
     // Gestione dell'altezza dinamica per mobile
     useEffect(() => {
         const handleResize = () => {
@@ -82,7 +115,7 @@ const Sidebar = ({
             try {
                 const data = JSON.parse(target.result);
                 setCanvasData(data);
-                localStorage.setItem('canvasData', JSON.stringify(data));
+                //localStorage.setItem('canvasData', JSON.stringify(data));
                 alert('Importazione completata!');
             } catch (error) {
                 console.error("Errore durante l'importazione:", error);
@@ -166,7 +199,13 @@ const Sidebar = ({
                                 </svg>
                             </button>
                         </div>
-
+                        <Library
+                            onLoadRepertoire={handleLoadRepertoire}
+                            canvasData={canvasData}
+                            onCreateNew={handleCreateNewOpening}
+                            activeRepertoireId={activeRepertoireId}
+                            setActiveRepertoireId={setActiveRepertoireId}
+                        />
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 onClick={onAddNode}
@@ -282,6 +321,62 @@ const Sidebar = ({
 
                 {/* SEZIONE FISSA CON PULSANTI - non scrollabile */}
                 <div className="shrink-0 p-4 border-t border-gray-800 bg-gray-900 space-y-2">
+                    {/* PULSANTE DI SALVATAGGIO */}
+                    <button
+                        onClick={onSaveRepertoire}
+                        disabled={isSaving}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-700/30 hover:bg-emerald-700/40 text-emerald-300 rounded-lg transition-colors border border-emerald-700/50"
+                    >
+                        {isSaving ? (
+                            <>
+                                <svg
+                                    className="animate-spin -ml-1 mr-2 h-5 w-5"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                    ></circle>
+                                    <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                </svg>
+                                Salvando...
+                            </>
+                        ) : (
+                            <>
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                                    />
+                                </svg>
+                                <span className="text-sm">Salva Repertorio</span>
+                            </>
+                        )}
+                    </button>
+
+                    {lastSaved && (
+                        <div className="text-center text-xs text-gray-500">
+                            Ultimo salvataggio: {lastSaved.toLocaleTimeString()}
+                        </div>
+                    )}
+
                     <button
                         onClick={onOpenChessboard}
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
@@ -435,11 +530,14 @@ Sidebar.propTypes = {
     onAddAnnotation: PropTypes.func.isRequired,
     selectedNode: PropTypes.object,
     updateNode: PropTypes.func,
+    canvasData: PropTypes.object,
     currentPGN: PropTypes.string,
     onOpenChessboard: PropTypes.func,
     onStartDrillMode: PropTypes.func,
     setCanvasData: PropTypes.func.isRequired,
     onDeleteNode: PropTypes.func,
+    onSaveRepertoire: PropTypes.func.isRequired,
+    isSaving: PropTypes.bool,
+    lastSaved: PropTypes.instanceOf(Date),
 };
-
 export default Sidebar;

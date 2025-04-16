@@ -4,6 +4,9 @@ import ChessboardPopup from './components/ChessboardPopup';
 import DrillMode from './components/DrillMode';
 import Sidebar from './components/Sidebar';
 import { generatePGN } from './utils/chessLogic';
+import { useAuth } from './components/AuthContext';
+import { databaseSaver } from './utils/databaseSaver';
+
 
 function App() {
     // Stato iniziale del canvas
@@ -17,16 +20,145 @@ function App() {
     const [selectedAnnotation, setSelectedAnnotation] = useState(null);
     const [isChessboardOpen, setIsChessboardOpen] = useState(false);
     const [isDrillModeOpen, setIsDrillModeOpen] = useState(false);
+    const { currentUser, userData, userRepertoires } = useAuth();
+    const hasLogged = useRef(false);
+
 
     // Refs
     const isGeneratingPGN = useRef(false);
-
-    // Aggiungi una classe all'html per controllare l'overflow
     useEffect(() => {
-        document.documentElement.classList.add('app-page');
+        // Esegui il log solo una volta dopo che i dati sono disponibili
+        if (currentUser && userData && !hasLogged.current) {
+            console.log('Utente autenticato:', {
+                uid: currentUser.uid,
+                email: currentUser.email,
+            });
+            console.log('Dati utente da Firestore:', userData);
+            console.log('Repertori utente:', userRepertoires);
+
+            // Imposta il flag per evitare log duplicati
+            hasLogged.current = true;
+        }
+    }, [currentUser, userData, userRepertoires]);
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState(null);
+    const activeRepertoireRef = useRef(null);
+    const [activeRepertoireId, setActiveRepertoireId] = useState(null);
+
+    const calculateFullLines = useCallback((canvas) => {
+        if (!canvas || !canvas.nodes || !canvas.connections) return [];
+
+        // Trova i nodi foglia (quelli senza figli)
+        const leafNodes = canvas.nodes.filter(
+            (node) => !canvas.connections.some((conn) => conn.fromId === node.id)
+        );
+
+        // Estrai i PGN dai nodi foglia
+        return leafNodes.map((node) => node.pgn).filter((pgn) => pgn && pgn.trim() !== '');
+    }, []);
+
+
+    // Funzione per inizializzare il sistema di salvataggio quando l'utente è autenticato
+    useEffect(() => {
+        if (currentUser && userRepertoires?.length > 0) {
+            // Se abbiamo repertori esistenti, inizializza con il primo
+            const activeRepertoire = userRepertoires[0];
+            activeRepertoireRef.current = activeRepertoire.id;
+
+            // Carica i dati dal repertorio attivo
+            try {
+                if (activeRepertoire.canvasData) {
+                    const parsedData = JSON.parse(activeRepertoire.canvasData);
+                    setCanvasData(parsedData);
+
+                    // Inizializza il database saver
+                    databaseSaver.initialize(currentUser.uid, activeRepertoire.id, parsedData);
+                }
+            } catch (error) {
+                console.error('Errore nel parsing dei dati del repertorio:', error);
+            }
+        }
 
         return () => {
-            document.documentElement.classList.remove('app-page');
+            // Cleanup quando il componente viene smontato
+            databaseSaver.cleanup();
+        };
+    }, [currentUser, userRepertoires]);
+
+    // Aggiorna il saver quando canvasData cambia
+    useEffect(() => {
+        if (currentUser && activeRepertoireRef.current && canvasData) {
+            databaseSaver.setCanvasData(canvasData);
+        }
+    }, [canvasData, currentUser]);
+
+    // Funzione per salvare manualmente
+    const handleSaveRepertoire = useCallback(async () => {
+        if (!currentUser || !activeRepertoireRef.current) {
+            // Se è il primo salvataggio, crea un nuovo repertorio
+            if (currentUser && canvasData) {
+                setIsSaving(true);
+                const title = prompt(
+                    'Inserisci un nome per il tuo repertorio:',
+                    'Nuovo Repertorio'
+                );
+
+                if (title) {
+                    const newId = await databaseSaver.createNewRepertoire(title);
+                    if (newId) {
+                        activeRepertoireRef.current = newId;
+                        setLastSaved(new Date());
+                        alert(`Repertorio "${title}" salvato con successo!`);
+                    }
+                }
+                setIsSaving(false);
+            }
+            return;
+        }
+
+        // Salva il repertorio esistente
+        setIsSaving(true);
+        const success = await databaseSaver.forceSave();
+        setIsSaving(false);
+
+        if (success) {
+            setLastSaved(new Date());
+        }
+    }, [currentUser, canvasData]);
+
+    // Rilevamento di alta attività per adattare gli intervalli di salvataggio
+    useEffect(() => {
+        let actionCounter = 0;
+        let lastActionTime = Date.now();
+
+        const handleUserAction = () => {
+            const now = Date.now();
+            const timeSinceLastAction = now - lastActionTime;
+
+            if (timeSinceLastAction < 60000) {
+                // Se l'azione avviene entro un minuto dalla precedente
+                actionCounter++;
+                if (actionCounter > 10) {
+                    // L'utente è molto attivo, aumenta l'intervallo di salvataggio
+                    databaseSaver.adjustSaveIntervalsBasedOnActivity(true);
+                    actionCounter = 0;
+                }
+            } else {
+                // Reset del contatore se è passato troppo tempo
+                actionCounter = 1;
+                databaseSaver.adjustSaveIntervalsBasedOnActivity(false);
+            }
+
+            lastActionTime = now;
+        };
+
+        // Eventi che indicano attività dell'utente
+        window.addEventListener('mousedown', handleUserAction);
+        window.addEventListener('keydown', handleUserAction);
+
+        return () => {
+            window.removeEventListener('mousedown', handleUserAction);
+            window.removeEventListener('keydown', handleUserAction);
         };
     }, []);
 
@@ -240,9 +372,18 @@ function App() {
             return newCanvasData;
         });
     }, []);
-    const handleStartDrillMode = () => {
+
+    const [drillModeFullLines, setDrillModeFullLines] = useState([]);
+
+    const handleStartDrillMode = useCallback(() => {
+        // Calcola le fullLines dal canvas attualmente attivo
+        const currentFullLines = calculateFullLines(canvasData);
+
+        // Passa queste fullLines come prop a DrillMode
+        setDrillModeFullLines(currentFullLines);
         setIsDrillModeOpen(true);
-    };
+    }, [canvasData, calculateFullLines]);
+
     const handleCloseDrillMode = () => {
         setIsDrillModeOpen(false);
     };
@@ -289,8 +430,10 @@ function App() {
         setCanvasData(newCanvasData);
 
         // Salva in localStorage
-        localStorage.setItem('canvasData', JSON.stringify(newCanvasData));
+        //localStorage.setItem('canvasData', JSON.stringify(newCanvasData));
     };
+    {/*
+    // Carica i dati dal localStorage all'avvio dell'app}
     useEffect(() => {
         // Carica i dati dal localStorage
         const savedData = localStorage.getItem('canvasData');
@@ -309,7 +452,7 @@ function App() {
                 console.error('Errore nel caricamento dei dati:', e);
             }
         }
-    }, []);
+    }, []);*/}
 
     // Nella sezione di rendering, passa la nuova prop al ChessboardPopup
     {
@@ -358,9 +501,12 @@ function App() {
                 canvasData={canvasData}
                 currentPGN={currentPGN}
                 onOpenChessboard={() => setIsChessboardOpen(true)}
-                onStartDrillMode={handleStartDrillMode} // Passa la nuova funzione
+                onStartDrillMode={handleStartDrillMode}
                 setCanvasData={setCanvasData}
                 onDeleteNode={handleDeleteNode}
+                onSaveRepertoire={handleSaveRepertoire}
+                isSaving={isSaving}
+                lastSaved={lastSaved}
             />
             <Canvas
                 canvasData={canvasData}
@@ -387,7 +533,7 @@ function App() {
 
             {/* Mostra la modalità drill se attiva */}
             {isDrillModeOpen && (
-                <DrillMode canvasData={canvasData} onClose={handleCloseDrillMode} />
+                <DrillMode fullLines={drillModeFullLines} onClose={handleCloseDrillMode} />
             )}
         </div>
     );

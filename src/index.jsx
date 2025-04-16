@@ -1,22 +1,29 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { HelmetProvider } from 'react-helmet-async';
-import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom';
-import App from './App';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import './index.css';
+import App from './App';
 import LandingPage from './pages/LandingPage';
+import { AuthProvider } from './components/AuthContext';
+import PrivateRoute from './components/PrivateRoute';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
     <React.StrictMode>
-        <HelmetProvider>
-            <Router>
+        <BrowserRouter>
+            <AuthProvider>
                 <Routes>
                     <Route path="/" element={<LandingPage />} />
-                    <Route path="/app" element={<App />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
+                    <Route
+                        path="/app"
+                        element={
+                            <PrivateRoute>
+                                <App />
+                            </PrivateRoute>
+                        }
+                    />
                 </Routes>
-            </Router>
-        </HelmetProvider>
+            </AuthProvider>
+        </BrowserRouter>
     </React.StrictMode>
 );
