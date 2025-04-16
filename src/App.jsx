@@ -93,38 +93,47 @@ function App() {
     }, [canvasData, currentUser]);
 
     // Funzione per salvare manualmente
-    const handleSaveRepertoire = useCallback(async () => {
-        if (!currentUser || !activeRepertoireRef.current) {
-            // Se è il primo salvataggio, crea un nuovo repertorio
-            if (currentUser && canvasData) {
-                setIsSaving(true);
-                const title = prompt(
-                    'Inserisci un nome per il tuo repertorio:',
-                    'Nuovo Repertorio'
-                );
+    const handleSaveRepertoire = useCallback(
+        async (customTitle) => {
+            if (!currentUser || !activeRepertoireRef.current) {
+                // Se è il primo salvataggio, crea un nuovo repertorio
+                if (currentUser && canvasData) {
+                    setIsSaving(true);
 
-                if (title) {
-                    const newId = await databaseSaver.createNewRepertoire(title);
-                    if (newId) {
-                        activeRepertoireRef.current = newId;
-                        setLastSaved(new Date());
-                        alert(`Repertorio "${title}" salvato con successo!`);
+                    // Usa il titolo passato da Sidebar se disponibile, altrimenti chiedi un nome
+                    const title =
+                        customTitle ||
+                        prompt('Inserisci un nome per il tuo repertorio:', 'Nuovo Repertorio');
+
+                    if (!title) {
+                        setIsSaving(false);
+                        return;
                     }
+
+                    if (title) {
+                        const newId = await databaseSaver.createNewRepertoire(title);
+                        if (newId) {
+                            activeRepertoireRef.current = newId;
+                            setLastSaved(new Date());
+                            alert(`Repertorio "${title}" salvato con successo!`);
+                        }
+                    }
+                    setIsSaving(false);
                 }
-                setIsSaving(false);
+                return;
             }
-            return;
-        }
 
-        // Salva il repertorio esistente
-        setIsSaving(true);
-        const success = await databaseSaver.forceSave();
-        setIsSaving(false);
+            // Salva il repertorio esistente
+            setIsSaving(true);
+            const success = await databaseSaver.forceSave();
+            setIsSaving(false);
 
-        if (success) {
-            setLastSaved(new Date());
-        }
-    }, [currentUser, canvasData]);
+            if (success) {
+                setLastSaved(new Date());
+            }
+        },
+        [currentUser, canvasData]
+    );
 
     // Rilevamento di alta attività per adattare gli intervalli di salvataggio
     useEffect(() => {
