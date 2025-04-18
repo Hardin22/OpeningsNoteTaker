@@ -500,7 +500,7 @@ const Sidebar = ({
                                     <span className="text-sm">Importa</span>
                                 </button>
                             </div>
-
+                            {/*}
                             <button
                                 onClick={() => setIsImportPgnOpen(true)}
                                 className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
@@ -519,7 +519,7 @@ const Sidebar = ({
                                     />
                                 </svg>
                                 <span className="text-sm">Importa PGN</span>
-                            </button>
+                            </button>*/}
 
                             {selectedNode && (
                                 <button

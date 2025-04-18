@@ -45,7 +45,6 @@ h1 {
     line-height: 1.1;
 }
 
-
 button:hover {
     border-color: #646cff;
 }
@@ -89,4 +88,33 @@ html.app-page,
 html.app-page body {
     height: 100%;
     overflow: hidden;
+}
+
+/* Nascondi scrollbar mantenendo la funzionalità di scorrimento */
+.no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+
+/* Styling per scrollbar nei contenuti */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background-color: rgba(107, 114, 128, 0.5);
+    border-radius: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.8);
 }
