@@ -776,6 +776,7 @@ const ChessboardPopup = ({
         ]
     );
 
+    // Modifica il posizionamento dell'EvalBar in base alla visualizzazione
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm"
@@ -790,7 +791,7 @@ const ChessboardPopup = ({
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Pulsante di chiusura ritorna absolute in alto a destra */}
+                {/* Pulsante di chiusura */}
                 <button
                     onClick={handleSafeClose}
                     className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-gray-800 bg-opacity-80 text-gray-300 hover:text-white hover:bg-gray-700 shadow-md"
@@ -805,25 +806,111 @@ const ChessboardPopup = ({
                     </svg>
                 </button>
 
+                {/* NAVBAR ORIZZONTALE MOBILE */}
+                {isMobileView && (
+                    <div className="w-full px-1 border-b border-gray-700">
+                        <div className="flex overflow-x-auto no-scrollbar">
+                            <button
+                                onClick={() => setActiveTab('moves')}
+                                className={`flex items-center p-3 whitespace-nowrap flex-1 justify-center ${
+                                    activeTab === 'moves'
+                                        ? 'text-white border-b-2 border-indigo-500 bg-gray-700'
+                                        : 'text-gray-400 hover:text-gray-200'
+                                }`}
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                                </svg>
+                                <span className="ml-1">Mosse</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('analysis')}
+                                className={`flex items-center p-3 whitespace-nowrap flex-1 justify-center ${
+                                    activeTab === 'analysis'
+                                        ? 'text-white border-b-2 border-indigo-500 bg-gray-700'
+                                        : 'text-gray-400 hover:text-gray-200'
+                                }`}
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                                    <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                                </svg>
+                                <span className="ml-1">Analisi</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('explorer')}
+                                className={`flex items-center p-3 whitespace-nowrap flex-1 justify-center ${
+                                    activeTab === 'explorer'
+                                        ? 'text-white border-b-2 border-indigo-500 bg-gray-700'
+                                        : 'text-gray-400 hover:text-gray-200'
+                                }`}
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                                <span className="ml-1">DB</span>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('notes')}
+                                className={`flex items-center p-3 whitespace-nowrap flex-1 justify-center ${
+                                    activeTab === 'notes'
+                                        ? 'text-white border-b-2 border-indigo-500 bg-gray-700'
+                                        : 'text-gray-400 hover:text-gray-200'
+                                }`}
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                                <span className="ml-1">Note</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Contenuto principale */}
                 <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
                     {/* Container principale */}
                     <div className="flex flex-col md:w-2/3 w-full h-full">
-                        {/* Contenitore scacchiera */}
+                        {/* Contenitore scacchiera - con EvalBar verticale solo per desktop */}
                         <div
                             ref={boardContainerRef}
                             className="flex justify-center items-center md:flex-1 md:py-4 py-0 w-full"
                         >
-                            {/* Barra di valutazione - visibile solo con engine attivo */}
-                            {stockfishEnabled && (
+                            {/* Barra di valutazione verticale - visibile solo su desktop con engine attivo */}
+                            {stockfishEnabled && !isMobileView && (
                                 <EvalBar
                                     evaluation={currentEvaluation}
                                     height={boardSize}
                                     isFlipped={boardOrientation === 'black'}
+                                    orientation="vertical"
                                 />
                             )}
 
-                            {/* Scacchiera a grandezza massimizzata con ombra per effetto elevazione */}
+                            {/* Scacchiera */}
                             <div
                                 style={{
                                     width: `${boardSize}px`,
@@ -857,7 +944,18 @@ const ChessboardPopup = ({
                             </div>
                         </div>
 
-                        {/* Controlli di navigazione - DESKTOP rimane invariato */}
+                        {/* Barra di valutazione orizzontale - visibile solo su mobile con engine attivo */}
+                        {stockfishEnabled && isMobileView && (
+                            <div className="w-full px-1 mt-1">
+                                <EvalBar
+                                    evaluation={currentEvaluation}
+                                    isFlipped={boardOrientation === 'black'}
+                                    orientation="horizontal"
+                                />
+                            </div>
+                        )}
+
+                        {/* Controlli di navigazione - desktop */}
                         <div className="hidden md:flex flex-col items-center mb-4 w-full">
                             {/* Pulsanti di navigazione ricentrati e ridisegnati */}
                             <div className="flex justify-center gap-1 mx-auto mb-2">
@@ -1167,227 +1265,143 @@ const ChessboardPopup = ({
                             </div>
                         </div>
 
-                        {/* INIZIO SEZIONE MOBILE-ONLY */}
+                        {/* INIZIO CONTENUTO MOBILE-ONLY - il contenuto dei tab, spostati dalla navbar */}
                         {isMobileView && (
-                            <>
-                                {/* Tab navigation - SOLO MOBILE */}
-                                <div className="flex w-full px-1 mt-2 border-b border-gray-700 overflow-x-auto no-scrollbar">
-                                    <button
-                                        onClick={() => setActiveTab('moves')}
-                                        className={`flex items-center p-2 whitespace-nowrap ${
-                                            activeTab === 'moves'
-                                                ? 'text-white border-b-2 border-indigo-500'
-                                                : 'text-gray-400 hover:text-gray-200'
-                                        }`}
-                                    >
-                                        <svg
-                                            className="w-4 h-4 mr-1"
-                                            viewBox="0 0 20 20"
-                                            fill="currentColor"
-                                        >
-                                            <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
-                                        </svg>
-                                        Mosse
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('analysis')}
-                                        className={`flex items-center p-2 whitespace-nowrap ${
-                                            activeTab === 'analysis'
-                                                ? 'text-white border-b-2 border-indigo-500'
-                                                : 'text-gray-400 hover:text-gray-200'
-                                        }`}
-                                    >
-                                        <svg
-                                            className="w-4 h-4 mr-1"
-                                            viewBox="0 0 20 20"
-                                            fill="currentColor"
-                                        >
-                                            <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
-                                            <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
-                                        </svg>
-                                        Analisi
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('explorer')}
-                                        className={`flex items-center p-2 whitespace-nowrap ${
-                                            activeTab === 'explorer'
-                                                ? 'text-white border-b-2 border-indigo-500'
-                                                : 'text-gray-400 hover:text-gray-200'
-                                        }`}
-                                    >
-                                        <svg
-                                            className="w-4 h-4 mr-1"
-                                            viewBox="0 0 20 20"
-                                            fill="currentColor"
-                                        >
-                                            <path
-                                                fillRule="evenodd"
-                                                d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-                                                clipRule="evenodd"
-                                            />
-                                        </svg>
-                                        Database
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('notes')}
-                                        className={`flex items-center p-2 whitespace-nowrap ${
-                                            activeTab === 'notes'
-                                                ? 'text-white border-b-2 border-indigo-500'
-                                                : 'text-gray-400 hover:text-gray-200'
-                                        }`}
-                                    >
-                                        <svg
-                                            className="w-4 h-4 mr-1"
-                                            viewBox="0 0 20 20"
-                                            fill="currentColor"
-                                        >
-                                            <path
-                                                fillRule="evenodd"
-                                                d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z"
-                                                clipRule="evenodd"
-                                            />
-                                        </svg>
-                                        Note
-                                    </button>
-                                </div>
-
-                                {/* Area contenuto sotto tab - SOLO MOBILE - scrollabile e dimensionata dinamicamente */}
-                                <div className="flex-1 overflow-y-auto px-1 py-2">
-                                    {activeTab === 'moves' && (
-                                        <div className="bg-gray-900 rounded-md p-2">
-                                            <div className="flex items-center mb-2">
-                                                <div
-                                                    className={`w-3 h-3 rounded-full mr-2 ${
-                                                        position.includes(' w ')
-                                                            ? 'bg-white'
-                                                            : 'bg-black'
-                                                    }`}
-                                                ></div>
-                                                <span className="text-gray-300">
-                                                    {position.includes(' w ')
-                                                        ? 'Muove il Bianco'
-                                                        : 'Muove il Nero'}
-                                                </span>
-                                            </div>
-
-                                            {moveHistory.length > 0 ? (
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    {moveHistory.map((move, index) => (
-                                                        <div
-                                                            key={index}
-                                                            onClick={() => navigateToMove(index)}
-                                                            className={`p-2 rounded text-sm cursor-pointer ${
-                                                                currentIndex === index
-                                                                    ? 'bg-indigo-600 text-white'
-                                                                    : 'text-gray-300 hover:bg-gray-800'
-                                                            }`}
-                                                        >
-                                                            {formatMoveNotation(move, index)}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-gray-400 text-center py-4">
-                                                    Nessuna mossa disponibile
-                                                </p>
-                                            )}
+                            <div className="flex-1 overflow-y-auto px-1 py-2">
+                                {activeTab === 'moves' && (
+                                    <div className="bg-gray-900 rounded-md p-2">
+                                        <div className="flex items-center mb-2">
+                                            <div
+                                                className={`w-3 h-3 rounded-full mr-2 ${
+                                                    position.includes(' w ')
+                                                        ? 'bg-white'
+                                                        : 'bg-black'
+                                                }`}
+                                            ></div>
+                                            <span className="text-gray-300">
+                                                {position.includes(' w ')
+                                                    ? 'Muove il Bianco'
+                                                    : 'Muove il Nero'}
+                                            </span>
                                         </div>
-                                    )}
 
-                                    {activeTab === 'analysis' && (
-                                        <div className="bg-gray-900 rounded-md p-2">
-                                            <button
-                                                onClick={toggleStockfish}
-                                                className={`flex items-center justify-between w-full p-2 rounded-md mb-2 ${
-                                                    stockfishEnabled
-                                                        ? 'bg-indigo-600 hover:bg-indigo-700'
-                                                        : 'bg-gray-700 hover:bg-gray-600'
-                                                } text-white transition-colors`}
-                                            >
-                                                <span className="flex items-center">
-                                                    <svg
-                                                        className="w-5 h-5 mr-2"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M13 10V3L4 14h7v7l9-11h-7z"
-                                                        />
-                                                    </svg>
-                                                    Analisi Engine (beta)
-                                                </span>
-                                                <div
-                                                    className={`w-10 h-5 p-1 rounded-full ${
-                                                        stockfishEnabled
-                                                            ? 'bg-indigo-300'
-                                                            : 'bg-gray-600'
-                                                    }`}
-                                                >
+                                        {moveHistory.length > 0 ? (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {moveHistory.map((move, index) => (
                                                     <div
-                                                        className={`w-3 h-3 rounded-full transition-transform ${
-                                                            stockfishEnabled
-                                                                ? 'bg-white transform translate-x-5'
-                                                                : 'bg-gray-400'
+                                                        key={index}
+                                                        onClick={() => navigateToMove(index)}
+                                                        className={`p-2 rounded text-sm cursor-pointer ${
+                                                            currentIndex === index
+                                                                ? 'bg-indigo-600 text-white'
+                                                                : 'text-gray-300 hover:bg-gray-800'
                                                         }`}
+                                                    >
+                                                        {formatMoveNotation(move, index)}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-400 text-center py-4">
+                                                Nessuna mossa disponibile
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeTab === 'analysis' && (
+                                    <div className="bg-gray-900 rounded-md p-2">
+                                        <button
+                                            onClick={toggleStockfish}
+                                            className={`flex items-center justify-between w-full p-2 rounded-md mb-2 ${
+                                                stockfishEnabled
+                                                    ? 'bg-indigo-600 hover:bg-indigo-700'
+                                                    : 'bg-gray-700 hover:bg-gray-600'
+                                            } text-white transition-colors`}
+                                        >
+                                            <span className="flex items-center">
+                                                <svg
+                                                    className="w-5 h-5 mr-2"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M13 10V3L4 14h7v7l9-11h-7z"
                                                     />
-                                                </div>
-                                            </button>
-
-                                            {stockfishEnabled && (
-                                                <StockfishComponent
-                                                    fen={position}
-                                                    onEvaluationChange={setCurrentEvaluation}
+                                                </svg>
+                                                Analisi Engine (beta)
+                                            </span>
+                                            <div
+                                                className={`w-10 h-5 p-1 rounded-full ${
+                                                    stockfishEnabled
+                                                        ? 'bg-indigo-300'
+                                                        : 'bg-gray-600'
+                                                }`}
+                                            >
+                                                <div
+                                                    className={`w-3 h-3 rounded-full transition-transform ${
+                                                        stockfishEnabled
+                                                            ? 'bg-white transform translate-x-5'
+                                                            : 'bg-gray-400'
+                                                    }`}
                                                 />
-                                            )}
-                                        </div>
-                                    )}
+                                            </div>
+                                        </button>
 
-                                    {activeTab === 'explorer' && (
-                                        <div className="bg-gray-900 rounded-md p-2">
-                                            <OpeningExplorer
+                                        {stockfishEnabled && (
+                                            <StockfishComponent
                                                 fen={position}
-                                                onMoveSelect={handleOpeningMoveSelect}
+                                                onEvaluationChange={setCurrentEvaluation}
                                             />
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
+                                )}
 
-                                    {activeTab === 'notes' && (
-                                        <div className="bg-gray-900 rounded-md p-2">
-                                            <h3 className="text-sm font-medium text-gray-300 mb-2">
-                                                Note sulla posizione
-                                            </h3>
-                                            <textarea
-                                                value={currentNote}
-                                                onChange={handleNoteChange}
-                                                onKeyDown={handleNoteKeyDown}
-                                                onBlur={saveNote}
-                                                className="w-full bg-gray-800 text-white text-sm p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                                rows={4}
-                                                placeholder="Inserisci note sulla posizione... (Premi Invio per salvare)"
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
+                                {activeTab === 'explorer' && (
+                                    <div className="bg-gray-900 rounded-md p-2">
+                                        <OpeningExplorer
+                                            fen={position}
+                                            onMoveSelect={handleOpeningMoveSelect}
+                                        />
+                                    </div>
+                                )}
 
-                                            <div className="mt-2">
-                                                <h4 className="text-xs font-medium text-gray-400 mb-1">
-                                                    Posizione FEN
-                                                </h4>
-                                                <div className="bg-gray-800 p-2 rounded-md text-xs text-gray-400 overflow-x-auto break-all">
-                                                    {position}
-                                                </div>
+                                {activeTab === 'notes' && (
+                                    <div className="bg-gray-900 rounded-md p-2">
+                                        <h3 className="text-sm font-medium text-gray-300 mb-2">
+                                            Note sulla posizione
+                                        </h3>
+                                        <textarea
+                                            value={currentNote}
+                                            onChange={handleNoteChange}
+                                            onKeyDown={handleNoteKeyDown}
+                                            onBlur={saveNote}
+                                            className="w-full bg-gray-800 text-white text-sm p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                            rows={4}
+                                            placeholder="Inserisci note sulla posizione... (Premi Invio per salvare)"
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+
+                                        <div className="mt-2">
+                                            <h4 className="text-xs font-medium text-gray-400 mb-1">
+                                                Posizione FEN
+                                            </h4>
+                                            <div className="bg-gray-800 p-2 rounded-md text-xs text-gray-400 overflow-x-auto break-all">
+                                                {position}
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            </>
+                                    </div>
+                                )}
+                            </div>
                         )}
-                        {/* FINE SEZIONE MOBILE-ONLY */}
+                        {/* FINE CONTENUTO MOBILE-ONLY */}
                     </div>
 
-                    {/* Pannello laterale per desktop - nascosto su mobile */}
+                    {/* Pannello laterale desktop */}
                     <div className="hidden md:block md:w-1/3 border-l border-gray-700 bg-gray-800 p-4 overflow-y-auto">
                         <div className="mb-2">
                             <div className="flex items-center">
@@ -1504,7 +1518,7 @@ const ChessboardPopup = ({
                     </div>
                 </div>
 
-                {/* Dialog per selettore varianti - resta invariato */}
+                {/* Dialog selettore varianti */}
                 {showChildSelector && (
                     <div
                         className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
