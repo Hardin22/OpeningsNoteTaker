@@ -136,40 +136,7 @@ function App() {
     );
 
     // Rilevamento di alta attività per adattare gli intervalli di salvataggio
-    useEffect(() => {
-        let actionCounter = 0;
-        let lastActionTime = Date.now();
-
-        const handleUserAction = () => {
-            const now = Date.now();
-            const timeSinceLastAction = now - lastActionTime;
-
-            if (timeSinceLastAction < 60000) {
-                // Se l'azione avviene entro un minuto dalla precedente
-                actionCounter++;
-                if (actionCounter > 10) {
-                    // L'utente è molto attivo, aumenta l'intervallo di salvataggio
-                    databaseSaver.adjustSaveIntervalsBasedOnActivity(true);
-                    actionCounter = 0;
-                }
-            } else {
-                // Reset del contatore se è passato troppo tempo
-                actionCounter = 1;
-                databaseSaver.adjustSaveIntervalsBasedOnActivity(false);
-            }
-
-            lastActionTime = now;
-        };
-
-        // Eventi che indicano attività dell'utente
-        window.addEventListener('mousedown', handleUserAction);
-        window.addEventListener('keydown', handleUserAction);
-
-        return () => {
-            window.removeEventListener('mousedown', handleUserAction);
-            window.removeEventListener('keydown', handleUserAction);
-        };
-    }, []);
+    
 
     // Funzione per costruire il percorso delle mosse da un nodo alla radice
     const buildMovePath = (nodes, connections, targetNodeId) => {

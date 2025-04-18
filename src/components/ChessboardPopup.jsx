@@ -866,6 +866,11 @@ const ChessboardPopup = ({
                                     onPieceDragBegin={onPieceDragBegin}
                                     onPieceDragEnd={onPieceDragEnd}
                                     boardOrientation={boardOrientation}
+                                    onDragOverSquare={() => {}}
+                                    customDropSquareStyle={{
+                                        boxShadow: 'none',
+                                        backgroundColor: 'none',
+                                    }}
                                 />
                             </div>
                         </div>

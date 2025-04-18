@@ -170,7 +170,7 @@ const Library = ({
             await refreshRepertoires();
 
             // Notifica l'utente
-            alert(`Apertura rinominata in "${newTitle}"`);
+
         } catch (error) {
             console.error('Errore nel rinominare il repertorio:', error);
             alert(`Errore nel rinominare: ${error.message}`);

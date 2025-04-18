@@ -215,7 +215,7 @@ export function useStockfish(onEvaluationChange) {
 
     // Funzione ottimizzata per analizzare la posizione
     const analyzeFen = useCallback(
-        (fen, maxDepth = 20) => {
+        (fen, maxDepth = 18) => {
             if (engineWorker.current && isReady) {
                 // Interrompi qualsiasi analisi in corso
                 if (isAnalyzing) {

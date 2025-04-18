@@ -580,6 +580,10 @@ const DrillMode = ({ fullLines = [], onClose }) => {
                                 onSquareClick={onSquareClick}
                                 onPieceDragBegin={onPieceDragBegin}
                                 onPieceDragEnd={onPieceDragEnd}
+                                customDropSquareStyle={{
+                                    boxShadow: 'none',
+                                    backgroundColor: 'none',
+                                }}
                             />
                         </div>
 
